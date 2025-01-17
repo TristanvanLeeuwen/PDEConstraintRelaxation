@@ -1,0 +1,1478 @@
+\documentclass[12pt]{amsart}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm,xcolor}
+\usepackage[foot]{amsaddr}
+\usepackage[margin=1in]{geometry}
+\usepackage[sort, authoryear]{natbib}
+\usepackage{hyperref}
+\usepackage{refcheck}
+\usepackage{graphicx}
+\usepackage{tikz,tikz-cd}
+\usetikzlibrary{matrix}
+\usetikzlibrary{decorations.markings}
+\usetikzlibrary{svg.path} 
+\usetikzlibrary{arrows.meta}
+\usepackage{subfig}
+\usepackage{cleveref}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\rd}{\mathrm{d}}
+\newcommand{\U}{\mathsf{U}}
+\newcommand{\V}{\mathsf{V}}
+\newcommand{\bbR}{\mathbb{R}}
+\newcommand{\cP}{\mathcal{P}}
+
+\newcommand{\yy}[1]{\textcolor{blue}{{YY: #1}}}
+\newcommand{\tvl}[1]{\textcolor{purple}{{TvL: #1}}}
+
+\newtheorem{thm}{Theorem}
+\newtheorem{cor}{Corollary}
+\newtheorem{rem}{Remark}
+\newtheorem{lma}{Lemma}
+
+
+\title{A data-driven approach to PDE-constrained optimization in inverse problems}
+
+\author{Tristan van Leeuwen$^{1,2}$}
+\address{$^1$Centrum Wiskunde \& Informatica, Amsterdam, The Netherlands}
+\address{$^2$Utrecht University, Utrecht, The Netherlands}
+
+\author{Yunan Yang$^3$}
+\address{$^3$Cornell University, Ithaca, NY, United States of America}
+
+\email{t.van.leeuwen@cwi.nl}
+\email{yunan.yang@cornell.edu}
+
+\date{\today}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Inverse problems are ubiquitous in science and engineering. Many of these are naturally formulated as a PDE-constrained optimization problem. These non-linear, large-scale, constrained optimization problems know many challenges, of which the inherent non-linearity of the problem is an important one. As an alternative to this \emph{physics-driven} approach, \emph{data-driven} methods have been proposed. These methods come with their own set of challenges, and it appears that, ideally, one would devise hybrid methods that combine the best of both worlds. In this paper, we propose one way of combining PDE-constrained optimization with recently proposed data-driven reduced-order models. Starting from an infinite-dimensional formulation of the inverse problem with discrete data, we propose a general framework for the analysis and discretisation of such problems. The proposed approach is based on a relaxed formulation of the PDE-constrained optimization problem, which reduces to a weighted non-linear least-squares problem. The weight matrix turns out to be the Gram matrix of solutions of the PDE, and it can be estimated directly from the measurements. We provide a number of representative case studies and numerical examples.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+Inverse problems lie at the heart of scientific and engineering endeavors, encompassing fields as diverse as medical imaging, geophysics, material science, and industrial process optimization. Unlike direct problems, where the relationship between inputs and outputs is well-defined and deterministic, inverse problems involve deducing unknown parameters or sources from observed measurements, often under incomplete or noisy conditions. The ill-posed nature of inverse problems, exacerbated by limited and noisy data, introduces a fundamental challenge that requires sophisticated mathematical and computational methodologies for obtaining reliable and accurate solutions.
+
+Partial Differential Equations (PDEs) serve as a versatile tool for modeling a wide array of physical processes, ranging from fluid dynamics and heat transfer to electromagnetic propagation and quantum mechanics. PDEs encode the underlying physics governing the system's behavior and are integral to accurate forward simulations. Leveraging PDEs within an optimization framework for solving inverse problems offers a promising avenue for striking a balance between the available data and the underlying physical principles. 
+
+However, solving PDE-constrained optimization problems arising from inverse problems is not without its challenges. The computational burden associated with solving PDEs, the high-dimensionality of the parameter space, and the nonlinearity of the objective functions pose significant obstacles. Traditional optimization methods often struggle to provide efficient and robust solutions in such scenarios. This has been a particularly active area of research in the geophysics community, and over the past decades various approaches have been proposed to mitigate these issues \cite{virieux09,Symes2014,van2015penalty,yang2018application,Symes2020, Engquist_2022,Lin2023}.
+
+In recent years, data-driven approaches have garnered increasing attention for their ability to learn complex relationships directly from data, bypassing the need for explicit mathematical forward models \cite{Brunton2019,deng2022openfwi,NIO2023}. By leveraging vast amounts of available data, these techniques can capture complex patterns and guide the optimization process in a more informed manner. The challenge with these methods is then shifted to extracting physically meaningful parameters from these data-driven models \cite{Borcea2018, Borcea2020}. These developments have naturally led to methods that combine physics-driven with data-driven models to optimally benefit from both viewpoints \cite{Ghattas2021,mula2023inverse,VanLeeuwen2023}.
+
+\subsection{Contributions}
+This work presents a data-driven approach for PDE-constrained optimization in inverse problems. We built on the work presented in \cite{van2015penalty} where the PDE-constrained problem is posed as a joint parameter-state estimation problem which enforces the PDE-constraints only approximately. Effectively, we lift the search space from the pure parameter to a much larger joint parameter-state space to mitigate the non-linearity of the optimization problem~\cite{fang2020lift}. Concretely, we pose it as estimating coefficients $c$ from given data by solving
+\begin{equation}\label{eq:intro}
+\min_{c,u_1, \ldots, u_n} {\textstyle{\frac{1}{2}}}\sum_{i,j=1}^n |\mathcal{P}_iu_j - d_{ij}| +  {\textstyle{\frac{\rho}{2}}}\|\mathcal{L}(c)u_j - \mathcal{P}_j\|_\mathsf{V}^2,
+\end{equation}
+where $\mathcal{L}(c):\mathsf{U}\rightarrow\mathsf{V} = \mathsf{U}^*$ denotes the partial differential operator with coefficient $c$, $\mathcal{P}_i\in \V$ denotes the linear sampling operator which also acts as the source terms, and $d_{ij} = \mathcal{P}_i\check{u}_j$ represents the observed data corresponding to the underlying true state $\check{u}_j = \mathcal{L}(\check{c})^{-1}\mathcal{P}_j$ for the true parameter $\check{c}$, and $\rho > 0$ is a penalty parameter. We denote the adjoints as $\mathcal{L}^* : \mathsf{U}\rightarrow\mathsf{V}$, $\mathcal{P}_i^*:\mathbb{R} \rightarrow \mathsf{V}$. Furthermore, both $\mathcal{L}$ and $\mathcal{L}^*$ have a well-defined inverse, denoted by $\mathcal{L}^{-1}, \mathcal{L}^{-*}$. The Riesz map is denoted as $\mathcal{R}:\mathsf{V}\rightarrow\mathsf{U}$.
+
+It has been shown empirically that this reformulation can improve the optimization landscape, making the iterative process less sensitive to initialisation, and hence leading to more robust inversion results~\cite{van2015penalty}. \emph{We innovate upon this previous work in the following three directions:}
+
+\emph{First}, we treat the optimization problem~\eqref{eq:intro} in the continuous setting and thereby provide a common framework for analysis and numerical implementation of a wide range of inverse problems based on the weak form of the PDE. Considering a finite number of measurements, we present a Representer Theorem (see \Cref{thm:Representer}) which shows that the estimated state lives in a finite-dimensional subspace of $\mathsf{U}$. This leads to a re-formulation of the traditional reduced approach for PDE-constrained optimization with an objective function equipped with a \textit{parameter-dependent residual weight}. In particular, it simplifies to
+\[
+\min_c  J(c):={\textstyle{\frac{1}{2}}}\sum_{i=1}^n\|\mathbf{e}_i(c)\|_{(I + \rho^{-1} G(c))^{-1}}^2,
+\]
+where $\mathbf{e}_i(c) \in \mathbb{R}^n$ is a vector with the $j$-th element $e_{ij}(c) = \mathcal{P}_i\mathcal{L}(c)^{-1}\mathcal{P}_j^* - d_{ij}$, and $G(c)\in \mathbb{R}^{n\times n}$ is a positive semi-definite matrix with elements $g_{ij}(c) = \mathcal{P}_i\left(\mathcal{L}^*(c)\mathcal{R}\mathcal{L}(c)\right)^{-1}\mathcal{P}_j^*$, $1\leq i,j\leq n$.
+
+\emph{Second}, based on the Representer Theorem, we analyze the two limiting cases, and provide an interpretation of the finite-dimensional residuals $\mathbf{e}_i\in\mathbb{R}^n$ in terms of the underlying function spaces $\mathsf{U}$ and $\mathsf{V}$. In particular, we show that the relaxed formulation~\eqref{eq:intro} embodies a rich interplay between
+\begin{itemize}
+    \item the finite-dimensional \emph{data-residual} $\left(\mathcal{P}_{i}\mathcal{L}(c)^{-1}\mathcal{P}_{j} - {d}_{ij} \right)^{n}_{i=1}\in \mathbb{R}^n$,
+    \item the \emph{solution-residual} $\mathcal{L}(c)^{-1}\mathcal{P}_j - \check{u}_j \in \mathsf{U}$,
+    \item the \emph{PDE-residual}  $\mathcal{P}_j - \mathcal{L}(c)\check{u}_j \in \mathsf{V}$.
+\end{itemize}
+Under some simplifying assumptions, we show the following limiting behaviour of $J$:
+\begin{itemize}
+\item[$\rho\rightarrow \infty$:] $J(c)$ measures the norm of the \emph{solution-residual} projected on to a finite-dimensional subspace $\mathsf{P}_n = \text{span}\{\mathcal{R}\mathcal{P}_i\}_{i=1}^n \subset \mathsf{U}$.
+ 
+\item[$\rho\rightarrow 0$:\,\,\,] $J(c)$ measures the norm of the \emph{PDE-residual}, projected on to a finite-dimensional subspace $\mathsf{W}_n = \text{span}\{\mathcal{R}^{-1}\mathcal{L}(c)^{-*}\mathcal{P}_i\}_{i=1}^n \subset \mathsf{V}$.
+\end{itemize}
+For a finite $\rho > 0$, the objective function interpolates between these two limiting situations. This is schematically depicted in Figure \ref{fig:one}. One might argue that it is more natural to use the PDE-residual because it can typically be parameterised to be affine in the coefficient $c$ for many common inverse problems, such as the Calder\'on problem~\cite{uhlmann2009electrical}, full-waveform inversion~\cite{van2015penalty} and inverse scattering~\cite{cakoni2005qualitative}. Precisely, in the $\rho\rightarrow 0$ case, under certain conditions, we can prove that the optimization problem is convex with respect to $c$ (see Corollary~\ref{thm:quadratic}), while the original objective function (when $\rho \rightarrow \infty$) is known to be highly non-convex, for all the examples mentioned above. 
+\begin{figure}
+\begin{tikzcd} 
+\text{solution residual}\arrow[r,"\mathcal{L}(c)"] &  \text{PDE residual}  \\
+\left(\mathcal{L}(c)^{-1} - \mathcal{L}(\check{c})^{-1}\right)\mathcal{P}_i\arrow[d,"\text{projected length over $\mathsf{P}_n$}"]\arrow[r,"\mathcal{L}(c)"]&\left(\mathcal{L}(\check{c})-\mathcal{L}(c)\right)\check{u}_i\arrow[d,"\text{projected length over $\mathsf{W}_n$}"]\\ 
+\|\mathbf{e}_i(c)\|_{2}&\|\mathbf{e}_i(c)\|_{G(c)^{-1}}\\
+\boxed{\text{The limit of } \rho \rightarrow \infty}  & \boxed{\text{The limit of } \rho \rightarrow 0}
+\end{tikzcd}
+\caption{\label{fig:one}
+The two limiting cases of the residual between simulated ($\mathcal{P}_i\mathcal{L}(c)^{-1}\mathcal{P}_j$) and measured ($d_{ij}=\mathcal{P}_i\mathcal{L}(\check{c})^{-1}\mathcal{P}_j$) data. When $\rho\rightarrow\infty$, we measure the $\ell^2$ norm of the \emph{data-residual}  ($e_{ij}(c) = \mathcal{P}_i\left(\mathcal{L}(c)^{-1} - \mathcal{L}(\check{c})^{-1}\right)\mathcal{P}_j$), which corresponds to the projected length of the \emph{solution-residual} $\left(\mathcal{L}(c)^{-1}- \mathcal{L}(\check{c})^{-1}\right)\mathcal{P}_i$ on $\mathsf{P}_n$. When $\rho\rightarrow 0$, we measure the \emph{$G(c)^{-1}$-weighted data residual}, which corresponds to the projected length of the \emph{PDE-residual} $\left(\mathcal{L}(c)-\mathcal{L}(\check{c})\right)\check{u}_i$ on  $\mathsf{W}_n $.
+}
+\end{figure}
+
+As a \emph{third contribution}, we show through a series of case studies how the matrix $G(\check{c})$ corresponding to the true coefficient can be estimated from the measured data $d_{ij}$ directly if the underlying space $\mathsf{U}$ is chosen appropriately. It turns out that this construction is closely related to recent progress on data-driven reduced order models pioneered by \cite{Borcea2018,Borcea2020,borcea2022waveform}.
+Thus, this work bridges the gap between PDE-constrained optimization and data-driven reduced-order models and opens up an avenue for efficient implementation of the relaxed formulation.
+
+\subsection{Outline}
+The remainder of this paper is organized as follows: \Cref{sec:theory} introduces the proposed data-driven approach, detailing its formulation and integration with PDE constraints. In~\Cref{sec:cases}, we present a series of case studies in which we apply the framework to a number of benchmark problems. Finally, \Cref{conclusions} concludes the paper with a summary of the findings and discussions on future research directions.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEORY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\section{Theory}\label{sec:theory}
+In this section we present our main results. First, we pose the inverse problem as unconstrained optimization over an extended search space consisting of both the parameter $c$ and the states $\{u_i\}_{i=1}^n$, followed by an equivalent reformulation in terms of the parameter $c$ and source terms $\{q_i\}_{i=1}^n$. Then, we present a Representer Theorem, which expresses the solution of the optimization problem over states or sources as a finite linear combination of basis functions. Using this representation, we then reduce the PDE-constrained optimization problem to an unconstrained optimization problem over the parameters only. In particular, we show that this formulation is equivalent to a conventional reduced formulation with a \textit{coefficient-dependent} weight on the residuals.
+
+\subsection{Preliminaries}
+% We consider the PDE 
+% $$\mathcal{L}(c)\,u  = f,$$ 
+% where $\mathcal{L}(c): \U  \rightarrow \V = \U^*$ is the PDE-operator with coefficient $c \in \mathsf{C}$.  The function spaces $\mathsf{U}$, $\mathsf{C}$ are Hilbert spaces whose inner products are denoted by $\langle \cdot, \cdot \rangle_{\mathsf{U}}$ and $\langle \cdot, \cdot \rangle_{\mathsf{C}}$, respectively. Note that these are defined to be linear in the first argument and antilinear in the second.
+% The state $u$ is an element of $\U$,  while the source term $f \in \V$. One can consider the adjoint of $\mathcal{L}(c)$ denoted by $\cL^*(c) :  \U \rightarrow \V$. That is,
+% \[
+% \langle u_2, \cL(c) u_1\rangle_{\U,\V} = \langle  u_1, \cL^*(c) u_2 \rangle_{\U,\V},\qquad \forall u_1, u_2 \in  \U\,,
+% \]
+% where $\langle\cdot, \cdot \rangle_{\U,\V}$ denotes the duality mapping between $\U$ and $\V$.
+% Note that $\mathcal{L}(c)$ is not the forward operator that maps the unknown coefficient $c$ to the observed data, and that $\mathcal{L}(c)$ has a well-defined inverse, denoted by $\mathcal{L}(c)^{-1}: \V\rightarrow \U$. Similarly, the inverse of the adjoint operator, $(\mathcal{L}(c)^{*})^{-1}$ exists and will be denoted by $\mathcal{L}(c)^{-*}$.
+For the remainder of the paper we consider the weak form of the PDE
+\begin{equation}\label{eq:weak}
+\mathcal{A}_c(u, \phi) = \mathcal{P}(\phi), \quad \forall\phi\in \mathsf{U},
+\end{equation}
+where $\mathcal{A}_c:\mathsf{U}\times \mathsf{U} \rightarrow \mathbb{C}$ is a sesquilinear form (i.e., linear in the first argument and anti-linear in the second argument) with parameters $c \in \mathsf{C}$ and $\mathcal{P} \in \overline{\mathsf{U}^*}$ is an \emph{antilinear} operator. These slightly unconventional definitions are chosen to treat the case where $\mathsf{U}$ is a complex Hilbert space. We furthermore introduce the \emph{linear} Riesz map $\mathcal{R}:\overline{\mathsf{U}^*}\rightarrow \mathsf{U}$ which allows us to represent any $\mathcal{P}\in \overline{\mathsf{U}^*}$ by a corresponding $p\in\mathsf{U}$, i.e., $p = \mathcal{R}\mathcal{P}$, such that 
+\[
+\mathcal{P}(u) = \langle \mathcal{R}\mathcal{P}, u\rangle_{\mathsf{U}},\quad \langle p, u\rangle_{\mathsf{U}} = \left(\mathcal{R}^{-1}p\right)(u).
+\]
+Throughout, we assume that  that the weak formulation is well-posed uniformly for all $c \in \mathsf{C}$ and that the Riesz representations $\{p_i\}_{i=1}^n$ of the functionals $\{\mathcal{P}_i\}_{i=1}^n$ are linearly independent.
+
+Given solutions $\{u_i\}_{i=1}^n$ corresponding to source terms $\{\mathcal{P}_i\}_{i=1}^n$, we consider measurements
+\[
+d_{ij} = \mathcal{P}_i(u_j),\quad i,j = 1,\ldots, n\,.
+\]
+The goal is to estimate the parameters $c$ from these measurements. The classical approach to doing so is by solving a PDE-constrained optimisation problem:
+\begin{equation}\label{eq:FWI}
+ \min_{c\in\mathsf{C}}  {\textstyle\frac{1}{2}} \sum_{i,j=1}^{n}   \big|\mathcal{P}_i(u_j) - d_{ij}\big|^2\,\,\,\,\text{s.t.}\,\,\,\,\mathcal{A}_c(u_j,\phi) = \mathcal{P}_j(\phi),\,\,\forall\phi\in \mathsf{U}.
+ \end{equation}
+ %with $u = (u_1, u_2, \ldots, u_n)$ denoting the states living in the product space $\mathsf{U}^n = \mathsf{U} \times \ldots \times \mathsf{U}$. 
+This optimization problem often suffers from very non-convex misfit landscapes that are challenging for gradient-based optimization algorithms. Some of the difficulties come from the ``hard'' equality constraint $\mathcal{A}_c(u_j,\phi) = \mathcal{P}_j(\phi)$, $\forall \phi\in \U$. Motivated by the challenges, we instead consider a relaxation of this problem by using a ``soft'' constraint, as proposed by \cite{van2015penalty}.
+  
+\subsection{Constraint-relaxation}
+An alternative to the constrained optimization problem~\eqref{eq:FWI} is the following:
+\begin{equation}\label{eq:eFWI}
+\min_{c\in\mathsf{C},q\in\mathsf{U}^n}   {\textstyle\frac{1}{2}} \sum_{i,j=1}^{n}   \big|\mathcal{P}_i(u_j) - d_{ij}\big|^2 +   {\textstyle\frac{\rho}{2}} \sum_{j=1}^n  \|q_j\|_{\mathsf{U}}^2\,\,\,\,\text{s.t.}\,\,\mathcal{A}_c(u_j,\phi) = \left(\mathcal{P}_j + \mathcal{R}^{-1}q_j\right)(\phi),\,\,\forall\phi\in \mathsf{U},
+ \end{equation}
+where $q = (q_1, q_2, \ldots, q_n)$ represent auxiliary source terms, and $\rho > 0$ is a trade-off parameter. Rather than enforcing that each $u_j$ has to be exactly the PDE solution for a fixed parameter $c$ with the source term $\mathcal{P}_j$, we allow the source term to ``deviate'' from $\mathcal{P}_j$ by a quantity determined by $q_j$, and then penalize the size of $q_j$ through $\frac{\rho}{2} \|q_j\|_\U$. The introduced extra degree of freedom, i.e., an enlarged model capacity,  can help match the data more easily. It is also a relaxation from the original ``hard'' PDE constraint as~\eqref{eq:eFWI} will reduce to the traditional approach~\eqref{eq:FWI} in the limit of $\rho\rightarrow \infty$. In this sense, this formulation fits in the context of model extension, pioneered by \cite{Symes2014,Symes2020,Symes2020a,Warner2016}. It has been shown that enlarging the search space can make the optimization problem have a better optimization landscape, and thus make it less sensitive to initialisation of the parameter $c$ when using gradient-based optimization algorithms. However, it is computationally not feasible to explicitly optimise over the enlarged space $\mathsf{C}\times \mathsf{U}^n$. To address this we show in~\Cref{thm2} that this extended formulation is equivalent to minimizing a weighted residual over $\mathsf{C}$ only through the application of the Representer Theorem (see~\Cref{thm:Representer}).
+
+Before moving forward to the theory, we first equivalently reformulate~\eqref{eq:eFWI} as
+\begin{eqnarray}\label{eq:eFWI2}
+\min_{c\in\mathsf{C},q\in\mathsf{U}^n}  {\textstyle\frac{1}{2}} \sum_{i,j=1}^{n}   \big|\mathcal{P}_i(v_j) - e_{ij}\big|^2 +   {\textstyle\frac{\rho}{2}} \sum_{j=1}^n  \|q_j\|_{\mathsf{U}}^2,\\
+ \begin{split}
+\text{s.t.}\,\,\mathcal{A}_c(u_j,\phi) &= \mathcal{P}_j(\phi)\,&\forall\phi\in \mathsf{U},\nonumber\\
+\mathcal{A}_c(v_j,\phi) &= \mathcal{R}^{-1}q_j(\phi)\,&\forall\phi\in \mathsf{U},\nonumber
+ \end{split}
+ \end{eqnarray}
+where $e_{ij} = d_{ij} - \mathcal{P}_i(u_j)$ depends on $c$ implicitly through $u_j$. We will use~\eqref{eq:eFWI2} for the following derivations.
+
+\subsection{A representer theorem}
+When the parameter $c$ is fixed, both~\eqref{eq:eFWI} and~\eqref{eq:eFWI2} are reduced to an inner problem, which is a quadratic with respect to $q$. Next, we show that its solution has a finite-dimensional representation. To facilitate the discussion, we split the inner problems for $\{q_j\}_{j=1}^n$ in ~\eqref{eq:eFWI2} in $n$ independent quadratic subproblems and introduce
+\begin{equation}\label{eq:eFWI_inner}
+J_j(q_j) =  {\textstyle\frac{1}{2}}\sum_{i=1}^{n}   \big|\mathcal{P}_i(v_j) - e_{ij}\big|^2 +   {\textstyle\frac{\rho}{2}}   \|q_j\|_{\mathsf{U}}^2,
+\end{equation}
+where $v_j$ depends on $q_j\in \mathsf{U}$ through the weak form of the PDE:
+\[
+\mathcal{A}_c(v_j,\phi) = \langle q_j,\phi \rangle_\mathsf{U}\quad\forall\phi\in \mathsf{U}.
+\]
+Note that, since $c$ is fixed, $e_{ij}$ is fixed as defined above. 
+
+\begin{thm}[A Representer Theorem]
+\label{thm:Representer}
+The functional defined in \eqref{eq:eFWI_inner} admits minimizers of the form
+\begin{equation}\label{eq:representation}
+q_j = \sum_{k=1}^n \overline{\alpha_{jk}}w_k,
+\end{equation}
+where $w_k \in \mathsf{U}$ satisfies an adjoint equation
+\begin{equation}\label{eq:weakadjoint}
+\overline{\mathcal{A}_c(\phi, w_k)} = \mathcal{P}_k(\phi),
+\end{equation}
+and the complex coefficients $\{\alpha_{jk}\}_{k=1}^n$ are solutions to the following linear system
+\[
+\sum_{k} G_{ik}\alpha_{jk} + \rho \alpha_{ji} = e_{ij},\quad i=1, \ldots, n,
+\]
+with $G_{ik} = \langle w_i, w_k\rangle_\mathsf{U}$.
+\end{thm}
+
+\begin{proof}
+Noting that
+$$\mathcal{P}_i({v}_j) = \overline{\mathcal{A}_c(v_j, w_i)} = \langle {w}_i, q \rangle_{\mathsf{U}},$$
+we can rewrite this as
+$$J_j(q_j)={\textstyle\frac{1}{2}}\sum_{i=1}^n |\langle w_i,{q_j}\rangle_{\mathsf{U}} - e_{ij}|^2 + {\textstyle{ {\textstyle\frac{\rho}{2}}}}\|q_j\|_{\mathsf{U}}^2.$$
+We can now directly apply Lemma \ref{lemma:optimality} (see Appendix) to find the desired result. 
+\end{proof}
+
+\subsection{A reduced formulation}
+With the above-stated result, we can now derive a reduced formulation of~\eqref{eq:eFWI2} that depends on the parameter $c$ only.
+\begin{cor}
+[Variable metric reduced formulation]
+\label{thm2}
+The relaxed problem \eqref{eq:eFWI2} in $(c, q) \in \mathsf{C}\times \mathsf{U}^n$ can be formulated equivalently in reduced form as
+\[
+\min_{c\in\mathsf{C}} J(c),
+\]
+with
+\begin{equation}\label{eq:new_obj}
+J(c) =  {\textstyle\frac{1}{2}}\sum_{j=1}^n\|\mathbf{e}_j(c)\|_{(I+\rho^{-1}G(c))^{-1}}^2 =   {\textstyle\frac{1}{2}}\text{trace}\left[E(c)^*(I+\rho^{-1}G(c))^{-1}E(c)\right],
+\end{equation}
+with
+${\mathbf{e}}_j(c) = [e_{1j}(c),\ldots,e_{nj}(c)]^\top$, and the matrix $G \in \mathbb{C}^{n\times n}$ as defined in Theorem \ref{thm:Representer}.
+\end{cor}
+\begin{proof}
+Using the result from Theorem~\ref{thm:Representer}, we have that
+$$\langle w_i, q_j\rangle_\mathsf{U} = \sum_{k=1}
+^n G_{ik}\alpha_{jk},$$
+$$\|q_j\|_{\mathsf{U}}^2 = \sum_{k=1}^n \sum_{l=1}^n\overline{\alpha_{jk}}\alpha_{jl}G_{k,l}.$$
+Then
+$$J_j(q_j)=  {\textstyle\frac{1}{2}}\|G\boldsymbol{\alpha}_j - \mathbf{e}_j\|_2^2 +  {\textstyle\frac{\rho}{2}}\boldsymbol{\alpha}_j^* G\boldsymbol{\alpha}_j.$$
+Using that $(G + \rho I)\boldsymbol{\alpha}_j = \mathbf{e}_j$ and the Woodbury matrix identity, we immediately find
+$$J_j(q_j) =  {\textstyle\frac{1}{2}}\mathbf{e}_j^*(I + \rho^{-1}G)^{-1}\mathbf{e}_j,$$
+after simplification, which yields~\eqref{eq:new_obj}.
+\end{proof}
+
+\subsection{Limiting cases}
+Here, we analyse the limiting behaviour of the objective defined in~\eqref{eq:new_obj} for $\rho\rightarrow 0$ and $\rho \rightarrow \infty$, which sheds light on the interpolative nature for a finite $\rho >0$. 
+\begin{lma}
+For $\rho \rightarrow \infty$ we can express the objective as
+\[
+J(c) =  {\textstyle\frac{1}{2}}\text{trace}\left[E(c)^*E(c)\right] + \mathcal{O}(\rho^{-1}).
+\]
+\end{lma}
+\begin{proof}
+This follows directly from \eqref{eq:new_obj} by expressing $(I + \rho^{-1}G)^{-1} = \sum_{k=0}^\infty (-\rho)^{-k}G^k$ which is valid for $\rho > \|G\|$, i.e., $\rho$ is larger than the largest eigenvalue of $G$.
+\end{proof}
+\begin{lma}
+\label{lma:rho_zero}
+We can write the objective for $\rho \rightarrow 0$ as
+\[
+J(c) = {\textstyle\frac{\rho}{2}}\text{trace}\left[E(c)^*G(c)^{-1}E(c)\right] + \mathcal{O}(\rho^2).
+\]
+\end{lma}
+\begin{proof}
+Since we assumed that $\{p_i\}_{i=1}^n$ are linearly independent, so are $\{w_i\}_{i=1}^n$ and $G$ is invertible. We can then express $(I + \rho^{-1}G)^{-1}=\rho G^{-1}(I + \rho G^{-1})^{-1} = \rho G^{-1}\sum_{k=0}^{\infty} (-\rho)^k G^{-k}$, which is valid for $ \|G^{-1}\| < 1/\rho$, i.e., $\rho$ should be smaller than the smallest eigenvalue of the matrix $G$. The desired result follows immediately.
+\end{proof}
+Based on these limiting cases, we define the following
+\begin{eqnarray}
+J_\infty(c) &=& \lim_{\rho\rightarrow \infty} J(c) ={\textstyle\frac{1}{2}}\text{trace}\left[E(c)^*E(c)\right]    \label{eq:Jinfty}\\
+J_0(c) &=& \lim_{\rho\rightarrow 0} \rho^{-1}J(c) =  {\textstyle\frac{1}{2}}\text{trace}\left[E(c)^*G(c)^{-1}E(c)\right].\label{eq:J0}
+\end{eqnarray}
+
+\subsection{Noiseless data}
+We can furthermore interpret these limiting cases in terms of projections of certain infinite-dimensional residuals on finite-dimensional subspaces. We assume noisless data $d_{ij} = \mathcal{P}_i(\check{u}_j)$ with $\check{u}_j$ the (weak) solution corresponding to $\mathcal{P}_j$ for the true coeffienct $\check{c}$.
+
+\begin{thm}
+When the Riesz representers $\{p_i\}_{i=1}^n$ are orthonormal and the measurements are noiseless, the functional $J_\infty$ defined in \eqref{eq:Jinfty} can be equivalently expressed in terms of an orthogonal projection of the solution-residual $u_i(c) - \check{u}_i \in \mathsf{U}$ on $\mathsf{P}_n = \text{span}\{p_i\}_{i=1}^n$ as
+\[
+J_{\infty}(c) = {\textstyle\frac{1}{2}}\sum_{j=1}^n\|\Pi_{\mathsf{P}_n}(u_j(c) - \check{u}_j)\|_{\mathsf{U}}^2,
+\]
+with $\Pi_{\mathsf{P}_n}$ the orthogonal projection on $\mathsf{P}_n$, $u_j(c)$ the weak solution corresponding to coefficient $c$ and $\check{u}_j$ the true state corresponding to the true coefficient $\check{c}$.
+\end{thm}
+\begin{proof}
+Since we assumed $\{p_i\}_{i=1}^n$ to be orthonormal, the projection of the solution residual $u_j(c) - \check{u}_j$ is given by 
+\[
+\Pi_{\mathsf{P}_n}(u_j(c) - \check{u}_j) = \sum_{i=1}^n \langle u_j(c) - \check{u}_j,p_i\rangle_{\mathsf{U}}p_i.
+\]
+Taking the norm we obtain
+\[
+{\textstyle\frac{1}{2}}\sum_{j=1}^n\|\Pi_{\mathsf{P}_n}(u_j(c) - \check{u}_j)\|_{\mathsf{U}}^2 = \sum_{j=1}^n \left\|\sum_{i=1}^n \overline{e_{ij}(c)}p_i\right\|_{\mathsf{U}}^2 = \sum_{j,i,i'=1}^n \overline{e_{ij}(c)}\langle p_i,p_{i'}\rangle_\mathsf{U}{e_{i'j}(c)},
+\]
+with $e_{ij}(c) = d_{ij} - \langle p_i, u_j\rangle_{\mathsf{U}}$ as defined before (cf. equation \eqref{eq:eFWI2}).
+Using orthonormality of $\{p_i\}_{i=1}^n$ again we get the desired result.
+\end{proof}
+\begin{thm}
+For noiseless measurements, the functional $J_0(c)$ can be equivalently expressed in terms of an orthogonal projection of the PDE-residual $\mathcal{E}_i(c) = \mathcal{A}_c(\check{u}_i,\cdot) -  \mathcal{A}_{\check{c}}(\check{u}_i,\cdot) \in \mathsf{V}$ on $\mathsf{W}_n = \text{span}\{w_i\}_{i=1}^n$ as
+\[
+J_0(c) = {\textstyle\frac{1}{2}}\sum_{j=1}^n \|\Pi_{\mathsf{W}_n}\mathcal{R}\mathcal{E}_j(c)\|_{\mathsf{U}}^2,
+\]
+with $\check{u}_j$ denoting the true state corresponding to the true coefficient $\check{c}$.
+\end{thm}
+\begin{proof}
+Consider the Riesz presentation of the PDE-residual $e_j = \mathcal{R}\mathcal{E}_j$. It's orthogonal projection on $\mathsf{W}_n = \text{span}\{w_i\}_{i=1}^n$ is given by
+\[
+\Pi_{\mathsf{W}_n}e_j = \sum_{i=1}^n \overline{\alpha_{ij}} w_i,
+\]
+where $\boldsymbol{\alpha}_{j} = G^{-1}\overline{\mathbf{r}_j}$ with $r_{ij} = \langle e_j,w_i\rangle_{\mathsf{U}} = \mathcal{E}_j(w_i)$ and $g_{ij}=\langle w_i, w_j\rangle_\mathsf{U}$. First note that
+\[
+r_{ij} = \mathcal{A}_c(\check{u}_j,w_i) -  \mathcal{A}_{\check{c}}(\check{u}_j,w_i) = \mathcal{A}_c(\check{u}_j,w_i) -  \mathcal{A}_{c}({u}_j,w_i) = \overline{\langle p_i,\check{u}_j\rangle} - \overline{\langle p_i,u_j\rangle} = \overline{e_{ij}},
+\]
+with $e_{ij} = \mathcal{P}_i(u_i) - d_{ij}$ as defined before (cf. equation \eqref{eq:eFWI2}). Taking the norm it follows that 
+\[
+\|\Pi_{\mathsf{W}_n}e_i(c)\|_{\mathsf{U}} = \boldsymbol{\alpha}_j^*G\boldsymbol{\alpha}_j = \|\mathbf{e}_i\|_{G^{-1}}.
+\]
+\end{proof}
+\begin{rem}
+These results are the analogue of the relations sketched in figure \ref{fig:one}.
+\end{rem}
+\subsection{Towards a convex formulation}
+So far, the Riesz representations $\{p_i\}_{i=1}^n$ followed from the definition of $\{\mathcal{P}_i\}_{i=1}^n$ and $\mathsf{U}$. We can instead start from $\{p_i\}_{i=1}^n$ and define a \emph{finite-dimensional} space $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$ and measurement functionals accordingly. The objective $J_0$ then simplifies significantly, as is shown in the following Corollary.
+\begin{cor}
+\label{thm:quadratic}
+If we let $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$, with $\{p_i\}_{i=1}^n$ sufficiently regular real-valued and linearly independent functions, we obtain
+\begin{equation}
+J_{0}(c) =  {\textstyle\frac{1}{2}}\text{trace}\left[\left(M - A(c)M^{-1}D\right)^*M^{-1}\left(M - A(c)M^{-1}D\right)\right],
+\end{equation}
+with $M_{ij} = \langle p_i, p_j \rangle_{\mathsf{U}}$ and $A(c)_{ij} = \overline{\mathcal{A}_c(p_j, p_i)}$.
+\end{cor}
+\begin{proof}
+Following the Galerkin approach, for each $j$, we let
+\[
+u_j = \sum_{k=1}^n U_{kj}\,p_k, 
+\]
+where the coefficients $U_{kj} \in \mathbb{C}$ are solved from
+\[
+\sum_{k=1}^n \mathcal{A}_c(p_k, p_i)U_{kj} = \langle p_j, p_i\rangle_\mathsf{U} \quad \text{for $i=1, 2, \ldots, n$}.
+\]
+The $n$-by-$n$ matrix $U$ has the $kj$-entry $U_{kj}$, $1\leq k,j \leq n$.
+
+Note that this assumes that the functions $\{p_i\}_{i=1}^n$ are sufficiently regular to be considered as the test functions in $\mathcal{A}_c(p_k, p_i)$.
+Similarly, assume the adjoint equation solution corresponding to the $j$-th source term is $\sum_{k=1}^n{W_{kj}} p_k $, $1\leq j \leq n$. Then coefficients  for the adjoint wavefields, $W_{kj}$, $1\leq k,j\leq n$, which gives rise to the matrix $W$, are solved from 
+\[
+\sum_{k=1}^n \overline{\mathcal{A}_c(p_i, p_k)}W_{kj} = \langle p_j, p_i\rangle_\mathsf{U} \quad \text{for $i=1, 2, \ldots, n$}.
+\]
+Then the data residual matrix $E(c)$ and the Gram matrix $G(c)$ have their $ij$-th entries to be
+\[
+e_{ij} = d_{ij} - \left\langle p_i, \sum_{k=1}^n U_{kj}p_k\right\rangle_{\mathsf{U}} = d_{ij} - \sum_{k=1}^n \langle p_i, p_k \rangle_\mathsf{U}\overline{U_{kj}},
+\]
+and
+\[
+g_{ij} = \left\langle \sum_{k=1}^n W_{ki}p_i, \sum_{\ell=1}^n W_{\ell j}p_\ell \right\rangle_\mathsf{U} = \sum_{k,\ell} W_{ki} \overline{W_{\ell j}} \langle p_k, p_\ell \rangle_\mathsf{U}.
+\]
+We introduce two more  $n$-by-$n$ matrices $M$ and $A$ 
+ with entries $M_{ij} = \langle p_i, p_j \rangle_{\mathsf{U}}$, $A(c)_{ij} = \overline{\mathcal{A}_c(p_j, p_i)}$. Note that by our assumptions both are invertible and moreover $M$ is real-valued and symmetric.
+We now find
+\[
+E(c) = D - M\overline{U(c)} =  D - MA(c)^{-1}M,
+\]
+\[
+G = \overline{W(c)}^* M \overline{W(c)} = MA(c)^{-1}MA(c)^{-*}M.
+\]
+Substituting this in the result of Lemma \ref{lma:rho_zero} we get the desired result.
+\end{proof}
+
+\begin{rem}\label{rem:quadratic}
+If $\mathcal{A}_c$ is affine in $c$,  and the inner produce $\langle \cdot, \cdot \rangle_{\mathsf{U}}$ does not depend on $c$,  then $J_0(c)$ is \textit{quadratic} in $c$, which is ideal for many gradient-based optimization algorithms. However,
+this result does \emph{not} imply that $c$ is uniquely recoverable from the measurements, as this additionally would require $A(c_1) = A(c_2) \Rightarrow c_1 = c_2 \,, \forall \, c_1, c_2 \in \mathsf{C}$.  Moreover, we do not have any guarantees that this choice for $\mathsf{U}$ will yield a reasonable approximation of the underlying physics described by the PDE.
+\end{rem}
+
+\begin{rem}\label{rem:direct}
+This result suggests a direct method for solving the inverse problem by setting up a system of $n^2$ (linear) equations of the form
+\[
+A(c) = MD^{-1}M,
+\]
+for a suitable parameterisation of $c$. If $\mathcal{A}_c$ is affine in $c$,  we only need to  solve a linear system with respect to $c$.
+\end{rem}
+
+\begin{rem}\label{rem:linear}
+If $\mathcal{A}_c$  and $\langle \cdot, \cdot \rangle_{\mathsf{U}}$ are both affine in $c$,  in particular,  if $\langle p_i,  p_j\rangle_{\mathsf{U}} = \mathcal{A}_c (p_i, p_j)$ which implies that $M = A(c)$,  then  $J_0(c)$ is (locally) piecewise \textit{linear} in $c$. %\tvl{at least in the sense of behaving like $|\cdot|$?}
+\end{rem}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CASE STUDIES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+
+\section{Case studies}\label{sec:cases}
+In this section we present a few case studies. The choice of $\mathsf{U}$ plays a central role. The two important aspects that we treat for each are \emph{i)} well-posedness of the weak form for the chosen space, and \emph{ii)} how to compute the Grammian matrix $G$ from the given measurements.
+
+\subsection{1D Elliptic equation}
+We consider a 1D elliptic PDE 
+\[
+-\left( c(x) u'(x)\right)' =  f(x), \quad x\in \Omega,
+\]
+with the boundary condition $u|_{\partial \Omega} = 0$. The corresponding forward (PDE) operator is denoted by 
+\[\mathcal{L}(c) : H^{1}_0(\Omega) \longrightarrow H^{-1}(\Omega)\,.
+\]
+Here, $\Omega \subset \mathbb{R}$ is a bounded domain for the solution $u$, and $u|_{\partial \Omega}$ denotes its boundary. The short-hand notation for the PDE is $\mathcal{L}(c) u = f \in H^{-1}(\Omega)$. 
+
+We further assume that the coefficient $c(x)$ is bounded both from above and below, i.e., $0 < a \leq c(x) \leq b < \infty$.  Therefore,  the PDE is uniformly elliptic.
+
+\subsubsection{Weak formulation}
+We consider real-valued functions, so $\mathcal{A}$ is bilinear and $\mathcal{P}$ is a linear operator:
+$$\mathcal{A}(u,\phi) = \int_\Omega \phi(x) \mathcal{L}(c) u(x) \mathrm{d}x\,, $$
+$$\mathcal{P}(u) = \int_{\Omega} f(x)u(x) \mathrm{d}x\,. $$
+We let $\mathsf{U} = H_0^1(\Omega)$ with a weighted $H^{1}(\Omega)$-inner product:
+\begin{equation}\label{eq:1D_E_U}
+    \langle u, v\rangle_{\mathsf{U}} = \int_\Omega v(x) \mathcal{L}(c) u(x) \mathrm{d}x =  \int_{\Omega} c(x)u'(x)v'(x) \mathrm{d}x.
+\end{equation}
+The operator $\mathcal{P}$ is well-defined with $f \in H^{-1}(\Omega)$. We can view the Riesz map as $\mathcal{R}:H^{-1}(\Omega)\rightarrow H^{1}_0(\Omega)$, defined through solving the PDE, $ -  \left(c(x) u(x)'\right)' = f(x)$, with homogeneous Dirichlet boundary conditions. 
+% It is easy to check that  
+% $$\int_\Omega v(x) \mathcal{L}(c) u(x) dx = \int_\Omega u(x) \mathcal{L}(c) v(x) dx,\quad \text{and}\quad \int_\Omega u(x) \mathcal{L}(c) u(x) dx \geq 0.
+% $$ 
+Let $\mathsf{U}$ be the space $H^{1}_0(\Omega)$ functions but equipped with the weighted inner product  given in~\eqref{eq:1D_E_U}, which induces the norm $\|\cdot \|_{\mathsf{U}} = \sqrt{\langle u, u \rangle_\mathsf{U}}$. Note that this is an equivalent norm to the standard $H^1$ norm since $  c \|\cdot \|_{H^1} \leq \|\cdot \|_{\mathsf{U}} \leq c^{-1} \|\cdot \|_{H^1}$ for some constant $c>0$ given by the Poincar\'e inequality.
+
+\subsubsection{Data-driven kernel}
+The Green's function for $\mathcal{L}(c)$, denoted by $\mathcal{G}(c)$, is a continuous symmetric positive definite kernel. Moreover, the Dirac delta function $\delta(x) \in H^{-1}(\Omega)$ since $\Omega \subseteq \mathbb{R}$. We define $\mathcal{P}_i (u) = u(x_i)$, which is equivalent to $f_i(x)  = \delta (x-x_i)$ for $x_i \in \Omega$. We denote by $u_j(x)$ the PDE solution with the source term $f_j$,  $j=1,\ldots, n$.   In this case, our measurements 
+\[
+d_{ij} = \mathcal{P}_i(u_j) = u_j (x_i), \quad 1\leq i,j \leq n.
+\]
+
+We can verify that $\left(H_0^1(\Omega), \|\cdot \|_{\mathsf{U}}\right)$ is a reproducing kernel Hilbert space (RKHS) with the reproducing kernel being $\mathcal{G}(c)$. Thus, $v_j = q_j$ in~\eqref{eq:eFWI2}, where $v_j$ is the PDE solution in $\left(H_0^1(\Omega), \|\cdot \|_{\mathsf{U}}\right)$. In this example, the source operators are Dirac delta functions,  belonging to $H^{-1}(\Omega)$, which is the dual space of $H_0^1(\Omega)$.  As a result, for any fixed $j = 1,\ldots,n$, we can reformulate~\eqref{eq:eFWI_inner} as
+\[
+\min_{q \in \left(H_0^1(\Omega), \,  \|\cdot \|_{\mathsf{U}}\right)}   {\textstyle\frac{1}{2}}\sum_{i=1}^n |q(x_i) - e_{ij}|^2 +  {\textstyle\frac{\rho}{2}} \|q\|_{\mathsf{U}}^2.
+\]
+The optimal solution $q_j$ is
+\[
+q_j(x) = \sum_{k=1}^n \alpha_{jk} \mathcal{G}(c) (x,x_k) = \sum_{k=1}^n \alpha_{jk} \, u_k(x) ,
+\]
+where $\boldsymbol{\alpha}_{j} = (G(c) + \rho I)^{-1} \boldsymbol{e}_{j}$. The $ij$-th entry of the kernel matrix $G(c)$ is  
+$$
+G_{ij} = \langle u_i, u_j\rangle_{\mathsf{U}} =  \int_\Omega u_i(x) \mathcal{L}(c) \mathcal{G}(c)(x,x_j)\mathrm{d}x =u_i(x_j) = d_{ji}\,. 
+$$
+Note that $G_{ij} = G_{ji}$, and the symmetry comes from the fact that $\langle u, v\rangle_{\mathsf{U}} = \langle v, u\rangle_{\mathsf{U}}$. That is, we can obtain the Gram matrix $G$.
+
+\begin{rem}
+   In this example of the 1D elliptic equation, our method coincides with the Representer Theorem in the theory of RKHS. However, the connection with RKHS is no longer true for higher-dimensional elliptic equation examples since $\delta(x)$ is not in $H^{-s}$ for $s \leq d/2$ where $d$ is the dimension.
+\end{rem}
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{2D Elliptic equation}
+Consider the 2D diffusion equation on a compact domain $\overline{\Omega}$ with a variable coefficient
+\begin{equation}\label{eq:2d_poisson}
+- \nabla \cdot \left( c(x) \nabla u(x) \right) = f(x),\quad x\in \Omega
+\end{equation}
+with the zero Dirichlet boundary condition on $\partial {\Omega}$. 
+We further  assume that $0 < a \leq c(x) \leq b < \infty$, which implies that the PDE is uniformly elliptic and well-posed for the set of variable coefficients that we are interested in.
+
+\subsubsection{Weak formulation}
+The weak formulation is to find $u(x) \in \mathsf{U}$ such that
+\begin{equation}\label{eq:forward_weak}
+\mathcal{A}_c(u, \phi) = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\end{equation}
+with
+\[
+\mathcal{A}_c(u,v) = \int_\Omega c(x)\, \nabla u(x) \cdot \nabla v(x) \,\mathrm{d}x\,,
+\]
+\[
+\mathcal{P}(u) = \int_\Omega f(x) u(x)\, \mathrm{d}x.
+\]
+The weak formulation of the adjoint problem is to find $w \in \mathsf{U}$ such that
+\begin{equation}\label{eq:adjoint_weak}
+\mathcal{A}_c(\phi, w ) = \mathcal{A}_c ( w,\phi) = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\end{equation}
+with $\mathcal{A}_c$ and $\mathcal{P}$ as before. Since the given elliptic operator is essentially self-adjoint, the adjoint problem~\eqref{eq:adjoint_weak} is exactly the same as the forward problem~\eqref{eq:forward_weak}.
+
+Similar to the 1D case,  we can define the inner product $\langle u, v \rangle_\mathsf{U}  = \mathcal{A}_c(u,v)$ which is a weighted $\dot{H}^1$ inner product by the positive variable coefficient $c(x)$. Then the Hilbert space $\mathsf{U}$  is given by
+\[
+\mathsf{U} = \left\{ u \, \left|\, \mathcal{A}_c(u,u) < \infty,
+\, u|_{\partial \Omega} = 0\right.\right\},
+\]
+and its dual space is also defined accordingly. Then the weak forms \eqref{eq:forward_weak} and \eqref{eq:adjoint_weak} are well-posed.
+
+
+\subsubsection{Data-driven kernel}
+We consider a finite number of sources $\{f_i\}$, $i=1,\ldots, n$, and define $p_i = \mathcal{R} f_i \in \mathsf{U}$, $\mathcal{P}_i(u) = \int_\Omega f_i \, u \rd x $, $1\leq i\leq n$. The corresponding PDE solution with the source $f_i$ is denoted by $u_i$. We first note that $w_i = u_i$ in~\eqref{eq:adjoint_weak} with $\mathcal{P}$ replaced by $\mathcal{P}_i$ since the PDE is self-adjoint. As a result, the Gram 8matrix
+\begin{equation}\label{eq:2d_poisson_kernel}
+G_{ij}(k) = \langle u_i, u_j\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u_i \cdot \nabla u_j  \,  \mathrm{d}x\ = \mathcal{A}_c(u_i,u_j) = \mathcal{P}_j(u_i) = d_{ji},\quad \forall i,j = 1,\ldots, n\,.
+\end{equation}
+That is, if $\{\mathcal{P}_i\}$ act as both the sources and the receivers, we can obtain the kernel matrix $G$ for the true coefficient through data measurements.
+
+
+% Then by using the weak form we find
+% \[
+% \langle u_i(k), u_j(\ell)\rangle_{\mathsf{U}} = \frac{\ell^2 d_{ij}(\ell) - k^2 \overline{d_{ji}(k)}}{\ell^2-k^2} + \imath \frac{\ell^2 k + k^2 \ell}{\ell^2 - k^2} m(1)u_i(1;k)\overline{u_j(1;\ell)}.
+% \]
+% Note that $d_{ij} = d_{ji}$ by reciprocity. Thus
+% \[
+% G_{ij}(k) = \lim_{\ell\rightarrow k} \frac{\ell^2 d_{ij}(\ell) - k^2 \overline{d_{ij}(k)}}{\ell^2-k^2} + \imath \frac{k\ell}{\ell - k}m(1)u_j(1;k)\overline{u_i(1;\ell)}.
+% \]
+% Introducing 
+% \[
+% f_{ij}(\lambda) = \lambda d_{ij}(\sqrt{\lambda}), \quad t_i(k) = k u_i(1;k),
+% \]
+% and applying Lemma \ref{lemma:one} to the first term and Lemma \ref{lemma:two} (see appendix) to the second term yields:
+% \[
+% G_{ij}(k) =  \Re f_{ij}'(k^2) + {\textstyle\frac{\imath}{2c(1)}} \left( t_j(k)\overline{t_i'(k)} - t_j'(k)\overline{t_i(k)}\right).
+% \]
+
+
+\subsubsection{Numerical example}
+Next, we use an example to illustrate the impact of $\rho$ as well as the choice of inner product $\langle \cdot, \cdot \rangle_{\mathsf{U}}$. Here, the domain $\Omega$ is a unit square $[0,1]^2$.
+
+We consider a parameterized variable coefficient 
+\[
+c(x_1,x_2;\theta) = |\sin x_1|^2 + |\sin x_2|^2+ (1+100\,\theta)|\sin(10\,x_1)|^2 + |\sin(10\,x_2)|^2\,,\quad [x_1,x_2]^\top \in \Omega\,,
+\]
+where $\theta \in [0,2]$, the range of possible parameter values and the ground truth is $\theta^* = 0$. 
+
+First, we assume a finite-dimensional space $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$. That is, the solution space is a linear combination of the Riesz representation of the source terms $\{f_i\}$. The sources are located near the boundary of the domain.
+In this setup, we consider two different inner products: a variable coefficient-independent one $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega \nabla u \cdot \nabla v  \,  \mathrm{d}x$ and a variable coefficient-dependent inner product $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u \cdot \nabla v  \,  \mathrm{d}x = \mathcal{A}_c(u,v)$, for any $u, v $ in the Hilbert space $\mathsf{U}$. We remark that, for the variable coefficient-dependent case,  the data-driven kernel formula~\eqref{eq:2d_poisson_kernel} still applies.  We calculate the objective function $J(c)$ defined in~\eqref{eq:new_obj} for these two inner products, and examine the optimization landscape with respect to different values of $\rho$. Results are shown in Figure~\ref{fig:Poisson2D_source_basis}.
+
+
+
+Note that this example satisfies the assumptions in~\Cref{thm:quadratic}, so the statements apply. Based on Remark~\ref{rem:quadratic}, when the inner product does not depend on $c$ and $\rho = 0$, the objective function is quadratic with respect to the $c$, which can be seen in~\Cref{fig:Poisson2D_source_basis}(A). On the other hand, when $\langle \cdot, \cdot \rangle_{\mathsf{U}} = \mathcal{A}_c(\cdot, \cdot)$, $J_0$ is linear in $c$ as addressed in Remark~\ref{rem:linear} and illustrated in~\Cref{fig:Poisson2D_source_basis}(B). Moreover, with the $c$-independent inner product, the classic PDE-constrained optimization is known to be non-convex, corresponding to the case $\rho = \infty$ in~\Cref{fig:Poisson2D_source_basis}(A). Interestingly, this is no longer true if we use the $c(x)$-dependent inner product, which yields a convex objective function with respect to the coefficient $c(x)$. %\yy{We should be able to justify this since $E = D - A$ with $A_{ij} = \mathcal{P}_i(u_j) = \int c(x) \nabla u_i\cdot \nabla u_j \rd x \approx \int c(x) \nabla p_i\cdot \nabla p_j \rd x?$ }
+
+
+\begin{figure}[ht!]
+    \centering
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-source-basis-H1semi-inner.pdf}}
+        \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-source-basis-C-H1semi-inner.pdf}}
+    \caption{The optimization landscape for PDE-constrained optimization based on the 2D inverse conductivity problem, for which the forward problem is the Poisson equation with a variable coefficient~\eqref{eq:2d_poisson}. The Hilbert space $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$. In (B), the inner product is given by $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega \nabla u \cdot \nabla v  \,  \mathrm{d}x$ while the inner product in (B) is given by  $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u \cdot \nabla v  \,  \mathrm{d}x$.}\label{fig:Poisson2D_source_basis}
+\end{figure}
+
+
+
+Next, we repeat the example above except that the Hilbert space $\mathsf{U}$ is now  spanned by 2D first-order Lagrange elements over the entire domain $[0,1]^2$. Figure~\ref{fig:Poisson2D_full_basis} shows the optimization landscapes corresponding to various values of $\rho \in [0,\infty)$ and the two inner products. When $\rho =\infty$, the problem reduces to the classic PDE-constrained optimization based on the 2D Poisson equation with the squared $L^2$ norm to measure the data misfit. Since the measured solution is nonlinear in $c$, the resulting objective function is non-convex, as seen in Figure~\ref{fig:Poisson2D_full_basis}. As we gradually reduce $\rho$ from $\infty$ to $0$, the optimization landscape varies and eventually becomes a linear function for the $c$-dependent inner product, and a quadratic function for the $c$-independent inner product, both are advantageous for finding the global minimum $\theta^* = 0$. The  convex landscapes at $\rho = 0$ align well with those in Figure~\ref{fig:Poisson2D_source_basis} even though our theory, i.e., Corollary~\ref{thm:quadratic}, currently does not apply to this setup.
+
+
+In both figures, we observe the gradual variance from the case $\rho = 0$ to the other limit $\rho = \infty$. These plots show the interpolative nature of the proposed norm~\eqref{eq:new_obj} for measuring the data misfit and the effectiveness in improving the optimization landscape when we incorporate the model and parameter properties into the objective function.
+
+\begin{figure}[ht!]
+    \centering
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-full-basis-H1semi-inner.pdf}}
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-full-basis-C-H1semi-inner.pdf}}
+    \caption{PDE-constrained optimization based on the 2D inverse conductivity problem, for which the forward problem is the Poisson equation with variable coefficient~\eqref{eq:2d_poisson}. The Hilbert space $\mathsf{U}$ is spanned by 2D first-order Lagrange elements over the domain $[0,1]^2$.  In (A), the inner product is given by  $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega \nabla u \cdot \nabla v  \,  \mathrm{d}x$. In (B), the inner product is given by $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u \cdot \nabla v  \,  \mathrm{d}x$. }\label{fig:Poisson2D_full_basis}
+\end{figure}
+
+
+
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{1D Helmholtz equation} Our next example is the 1D Helmholtz equation
+\[
+-u''(x;k) - (k / c(x))^2 u(x;k) = f(x),
+\]
+with boundary conditions
+\[
+u(0;k) = 0,
+\]
+\[
+u'(1;k) - \imath \left(k/c(1)\right) u(1;k) = 0.
+\]
+We assume furthermore assume that $0 < a \leq c(x) \leq b < \infty$.
+
+\subsubsection{Weak formulation}
+The weak formulation is to find $u(\cdot\,; \,  k) \in \mathsf{U}$ such that
+\begin{equation}\label{eq:weak_helm}
+\mathcal{A}_{c,k}(u(\cdot\,;\, k), \phi) = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\end{equation}
+with the bilinear form defined by
+\[
+\mathcal{A}_{c,k}(u,v) = \int_0^1 u'(x) \overline{v'(x)}\mathrm{d}x - k^2 \int_0^1 c(x)^{-2}u(x) \overline{v(x)}\mathrm{d}x -\imath k c(1)^{-1}u(1)\overline{v(1)},
+\]
+\[
+\mathcal{P}(\phi) = \int_0^1 f(x)\overline{\phi(x)}\mathrm{d}x.
+\]
+The weak formulation of the adjoint problem is to find $w(\cdot \,;\, k) \in \mathsf{U}$ such that
+\begin{equation}\label{eq:weakadjoint_helm}
+\overline{\mathcal{A}_{c,k}(\phi, w(\cdot \,;\, k))} = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\end{equation}
+with $\mathcal{A}_{c,k}$ and $\mathcal{P}$ as before. 
+
+We define the inner product without weighting by $c(x)$ as $\langle u, v \rangle_\mathsf{U} = \int_0^1 u'(x)\overline{v'(x)}\mathrm{d}x$ and define the Hilbert space $\mathsf{U}$  as
+\[
+\mathsf{U} = \left\{ u \, \left|\, \|u\|_{\mathsf{U}} < \infty, u(0) = 0\right.\right\}.
+\]
+We then define its dual in the usual way. The the weak forms \eqref{eq:weak_helm} and \eqref{eq:weakadjoint_helm} are well-posed for $f \in H^{-1}$ \cite{Ihlenburg1997}.
+
+The measurements are defined correspondingly by 
+\[
+d_{ij}(k) = \mathcal{P}_i(u_j(\cdot \,;\, k)) = \int_0^1 f_i(x) \overline{u_j(x;k)}  \rd x,
+\]
+where $i,j = 1,\ldots,n$, and $u_j(x;k)$ is the solution to~\eqref{eq:weak_helm} with the source term $f_j(x)$. Correspondingly, $w_j(x;k)$ is the solution to~\eqref{eq:weakadjoint_helm} with the source term $f_j(x)$, $j=1,\ldots,n$.
+
+\subsubsection{Data-driven kernel}
+We first note that $w_i(x;k) = \overline{u_i(x;k)}$ based on the properties of~\eqref{eq:weak_helm} and~\eqref{eq:weakadjoint_helm} (cf. Lemma \ref{lma:hlmholtz}), so  we have that %\yy{Should it be $w_i(x;k) = {u_i(x;k)}$? because $\overline{\mathcal{A}_{c,k}(\phi, w(\cdot \,;\, k))}  = \mathcal{A}_{c,k}( w(\cdot \,;\, k), \phi)$?}
+\[
+G_{ij}(k) = \langle u_j(\cdot;k), u_i(\cdot;k)\rangle_{\mathsf{U}},
+\]
+where $G\in \mathbb{R}^{n\times n}$ is Grammian in~\Cref{thm:Representer}. 
+Then by using the weak form we find that
+\[
+\langle u_i(\cdot;k), u_j(\cdot;\ell)\rangle_{\mathsf{U}} = \frac{\ell^2 d_{ij}(\ell) - k^2 \overline{d_{ji}(k)}}{\ell^2-k^2} + \imath \frac{\ell^2 k + k^2 \ell}{\ell^2 - k^2} m(1)u_i(1;k)\overline{u_j(1;\ell)}.
+\]
+Note that $d_{ij} = d_{ji}$ by reciprocity, $i,j=1,\ldots,n$. Thus, we have an alternative way of obtaining the Grammian without using $u_i(x;k)$, $i=1,\ldots,n$, as follows:
+\[
+G_{ij}(k) = \lim_{\ell\rightarrow k} \frac{\ell^2 d_{ij}(\ell) - k^2 \overline{d_{ij}(k)}}{\ell^2-k^2} + \imath \frac{k\ell}{\ell - k}m(1)u_j(1;k)\overline{u_i(1;\ell)}.
+\]
+Introducing new functions $\{s_{ij}\}_{i,j=1}^n$ and $\{t_i\}_{i=1}^n$,
+\[
+s_{ij}(\lambda) := \lambda d_{ij}(\sqrt{\lambda}), \quad t_i(\lambda) = \lambda u_i(1;\lambda),
+\]
+and applying Lemma \ref{lemma:one} to the first term and Lemma \ref{lemma:two} (see appendix) to the second term yields:
+\begin{equation}\label{eq:data_gram_helm}
+G_{ij}(k) =  \Re s_{ij}'(k^2) + {\textstyle\frac{\imath}{2c(1)}} \left( t_j(k)\overline{t_i'(k)} - t_j'(k)\overline{t_i(k)}\right).
+\end{equation}
+\subsubsection{Numerical example}
+We consider a constant sound speed and $\mathcal{P}_iu = u(x_i)$ (i.e., $f_i(x) = \delta(x-x_i)$). The solution in that case is given by the analytic formula 
+\[
+u_i(x; k) = 
+\begin{cases} 
+(k/c)^{-1}\sin((k/c) x)e^{\imath (k/c) x_i}
+& x \leq x_i, \\
+(k/c)^{-1}\sin((k/c) x_i)e^{\imath (k/c) x}
+& x > x_i. \\
+\end{cases} 
+\]
+This allows us to compute the Grammian $G$ in closed form and plot the objective functions in different formulations:
+\begin{align}
+J_1(c) &= {\textstyle\frac{1}{2}}\text{trace}\left(E(c)^*E(c)\right),\label{conventional}\\
+J_2(c) &= {\textstyle\frac{1}{2}}\text{trace}\left(E(c)^*\left(I + \rho^{-1}G(c)\right)E(c)\right),\label{variable metric}\\
+J_3(c) &= {\textstyle\frac{1}{2}}\text{trace}\left(E(c)^*\left(I + \rho^{-1}\widetilde{G}\right)E(c)\right).\label{data-driven metric}
+\end{align}
+Note that the fundamental difference between~\eqref{variable metric} and~\eqref{data-driven metric} is that the former uses a $c(x)$-dependent Grammian, while the latter uses the data-driven Grammian defined in~\eqref{eq:data_gram_helm}. On the other hand, \eqref{conventional} is the squared $L^2$ norm of the data misfit.
+
+
+
+In this experiment, we take measurements at $x_i = i / (n+1)$ for $i = 1, \ldots, n$ and generate (noiseless) data for $c(x) = 1$ (constant speed). The behavior of the three objectives for various values of $(n, k, \rho)$ is shown in Figures \ref{fig:helmholtz1da} - \ref{fig:helmholtz1dc}.
+
+
+We highlight a few interesting observations. First, the optimization problem generally gets more challenging (with more local minima) for larger $k$ (higher frequencies). This is expected for full waveform inversion (FWI) in both the time and frequency domains; the latter is the case studied here. Second, the relaxed approach for small $\rho$ makes the problem easier to solve (i.e., with fewer local minima, which is advantageous for gradient-based optimization algorithms) when more measurements are available (following Theorem \ref{thm:quadratic}). Third, the data-driven metric formulated in~\eqref{data-driven metric} is a good alternative to the variable metric approach given in~\eqref{variable metric} in these examples. Note that we do not need to differentiate the Grammian using the data-driven metric, but only the data misfit $E(c)$, which can be computed using the adjoint-state method. Therefore, using any gradient-based optimization algorithms, such as steepest descent and nonlinear conjugate gradient methods, the objective function \eqref{data-driven metric} incurs the same computational cost compared to the objective function~\eqref{conventional}. However, the former is shown to have much better optimization landscapes.
+
+\begin{figure}
+\includegraphics[scale=.5]{Figures/Helmholtz1D_a.png}
+\caption{Helmholtz example: different objective functions for $n=2$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1da}
+\end{figure}
+
+\begin{figure}
+\includegraphics[scale=.5]{Figures/Helmholtz1D_b.png}
+\caption{Helmholtz example: different objective functions for $n=5$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1db}
+\end{figure}
+
+\begin{figure}
+\includegraphics[scale=.5]{Figures/Helmholtz1D_c.png}
+\caption{Helmholtz example: different objective functions for $n=10$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1dc}
+\end{figure}
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Schr{\"o}dinger equation}
+We consider the following Schr{\"o}dinger equation
+\begin{equation}\label{eq:sch_eqn}
+-\nabla^2 u(x;\lambda) + c(x)u(x;\lambda) - \lambda u(x;\lambda) = f(x), \quad x \in \Omega\subset{\mathbb{R}^d},
+\end{equation}
+with homogeneous Dirichlet boundary conditions. The inverse problem of estimating the scattering potential $c(x)$ from measurements of $u$ for various source term $f(x)$ and different values of $\lambda$ is often studied in the context of inverse scattering \cite{imanuvilov2012inverse,Novikov2022}.
+
+\subsubsection{Weak formulation}
+We first define the bilinear form
+$$\mathcal{A}_{c,\lambda}(u,v)=\int_{\Omega} \nabla u(x)\cdot \nabla v(x)\mathrm{d}x + \int_{\Omega} c(x)u(x)v(x)\mathrm{d}x - \lambda \int_{\Omega} u(x)v(x)\mathrm{d}x,$$
+$$\mathcal{P}_i(u) = \int_{\Omega} f_i(x)u(x)\mathrm{d}x.$$
+The measurements are then denoted by
+\[
+d_{ij}(\lambda) = \mathcal{P}_i(u_j(\cdot\,;\,\lambda)) = \langle p_i, u_j(\cdot \,;\,\lambda)\rangle_\mathsf{U},
+\]
+where $u_i(\cdot\,;\,\lambda)$ is the (weak) solution of the Schr{\"o}dinger equation for frequency $\lambda$ and source term $f_i$. Due to symmetry we immediately find $d_{ij}(\lambda)=d_{ji}(\lambda)$, $i,j=1,\ldots,n$.  
+
+To guarantee the well-posedness of the forward problem, it is natural to consider the function space $\mathsf{U} = H_0^1(\Omega)$, so the forward problem well-posed for $f_i \in H^{-1}(\Omega)$~\cite{Victor2014}. We will first consider this choice with a $c(x)$-weighted inner product to be able to derive a data-driven Gram matrix $G$. Alternatively, we can also use the usual (unweighted) $H^1_0(\Omega)$ inner product and consider a finite-dimensional subspace spanned by the Riesz representations $\{p_i\}_{i=1}^n \subset H_0^1(\Omega)$ of $\mathcal{P}_i \in H^{-1}(\Omega)$ to derive a direct inversion method.
+
+\subsubsection{Data-driven kernel}
+To derive an expression that relates the kernel to the measurements, consider the weighted inner product:
+$$\langle u,v\rangle_{\mathsf{U}} = \int_{\Omega} \nabla u(x)\cdot\nabla v(x)\mathrm{d}x + \int_{\Omega} c(x)u(x)v(x)\mathrm{d}x.$$
+Since the equation~\eqref{eq:sch_eqn} is self-adjoint, we get $w_i = u_i$ for $i=1,\ldots,n$, and hence the $ij$-th entry of the Gram matrix is given by
+$$G_{ij}(\lambda) = \langle u_i(\cdot \, ;\, \lambda), u_j(\cdot\,;\,\lambda)\rangle_\mathsf{U}.$$
+We will use the short-hand notation $u_i(\lambda) = u_i(\cdot \, ;\, \lambda)$. From the weak form, we find that 
+$$\langle u_i(\lambda), u_j(\mu)\rangle_{\mathsf{U}} - \lambda\langle u_i(\lambda),u_j(\mu)\rangle_{L^2(\Omega)} = d_{ij}(\mu),$$
+$$\langle u_i(\lambda), u_j(\mu)\rangle_{\mathsf{U}} - \mu\langle u_i(\lambda),u_j(\mu)\rangle_{L^2(\Omega)} = d_{ij}(\lambda).$$
+Using these two relations, we can rewrite the $ij$-th entry of the Gram matrix as
+$$G_{ij}(\lambda)=\langle u_i(\lambda), u_j(\lambda)\rangle_{\mathsf{U}} = \lim_{\mu\rightarrow\lambda}\frac{\mu d_{ij}(\mu) - \lambda d_{ij}(\lambda)}{\mu-\lambda}.$$
+This simplifies to
+$$
+G_{ij}(\lambda) = \lim_{h\rightarrow 0}\frac{(\lambda + h)d_{ij}(\lambda+h) - \lambda d_{ij}(\lambda)}{h} = d_{ij}(\lambda)+\lambda d_{ij}'(\lambda).
+$$
+To calculate $G_{ij}(\lambda)$,  we thus need to measure the derivative of the measurements with respect to the hyperparameter $\lambda$ as well, which can only be computed when we have measurements with densely varying $\lambda$ so that a divided difference approximation yields a reasonably good result. % \yy{I can verify that this formula is correct. However, I don't have any insights on how to create local minima for this case.}
+
+\subsubsection{A direct method}
+To illustrate the effectiveness of the direct method~\eqref{eq:direct}, we consider the $c$-independent inner product: $\langle u, v\rangle_{\mathsf{U}} = \int_{\Omega} \nabla u(x)\cdot\nabla v(x) \mathrm{d}x$ and define $p_i$ as the solution of $- \nabla^2 p_i = f_i$ with the zero Dirichlet boundary conditions. That is, $p_i$ is the Riesz representation of $f_i$ given this inner product. Moreover, we assume that $\mathsf{U} = \text{span}\{p_1,\ldots, p_n\}$, and the domain $\Omega = [0,1]^2 \subset \mathbb{R}^2$.
+
+\begin{figure}
+    \centering
+    \subfloat[The true coefficient]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a_true.png}}
+    \subfloat[Basis $\{p_i\}$ of large width]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a_inv_good_basis.png}}\\
+    \subfloat[Basis $\{p_i\}$ of moderate width]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a_inv_middle_basis.png}}
+    \subfloat[Basis $\{p_i\}$ of small width]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a_inv_bad_basis.png}}
+    \caption{A direct method~\eqref{eq:direct} to reconstruct the variable coefficient for the linear Schr\"odingr equation. (A): the true coefficient $c(x)$; (B)-(D): the direct reconstruction using the Gaussian basis function with different variances varying from large to small.}
+    \label{fig:direct_method}
+\end{figure}
+
+
+We can now apply the approach suggested by Corollary~\ref{thm:quadratic} and Remark~\ref{rem:direct}. Expressing the scattering potential $c(x)$ in terms of a basis $\{\psi_k\}_{k=1}^m$, i.e., $c(x) = \sum_{k=1}^m c_k \psi_k(x)$, we get the following set of $n^2$ linear equations for its coefficients $\{c_k\}_{k=1}^m$:
+\begin{equation}\label{eq:direct}
+\sum_{k=1}^m K_{ijk} \, c_k = -M_{ij} + \lambda S_{ij} + \left(MD(\lambda)^{-1}M\right)_{ij}, \, i,j = 1, 2, \ldots, n,
+\end{equation}
+with
+\[
+K_{ijk} = \langle \psi_k p_i\,, \,p_j\rangle_{L^2(\Omega)}\,, \quad M_{ij} = \langle p_i\,, \,p_j\rangle_{\mathsf{U}}, \quad S_{ij} = \langle p_i\,, \, p_j\rangle_{L^2(\Omega)}.
+\]
+Note that if $n^2 \gg m$, the linear system is severely over-determined. We may use a subset of the $n^2$ equations instead.
+
+The basis function for the variable coefficient $c(x)$, $\{\psi_k\}$, is set to be
+\[
+\psi_k(x) = |\sin ( k x )|^2, \quad x\in \mathbb{R}^2\,,\quad k = 1,2,\ldots, 10\,.
+\]
+The reference coefficients $\{c_k\}_{k=1}^{10}$ are randomly drawn. In Figure~\ref{fig:direct_method}(A), we present the groudtruth for reference. We set up the tests such that the basis function $p_i$ is a Gaussian centered at location $x_i$ with different width $a>0$:
+\[
+p_i(x) = \exp{(-a|x-x_i|^2)},\quad x\in \mathbb{R}^2\,,\quad i = 1,\ldots,40\,.
+\]
+The location of the Gaussian centers $\{x_i\}_{i=1}^{40}$ is fixed for all sets of basis. 
+
+\begin{figure}
+\centering
+\includegraphics[width = 0.5\textwidth]{Figures/schrodinger_basis_loc.png}
+    \caption{The location of the Gaussian centers for the direct method on the domain $[0,1]^2$.}\label{fig:centers}
+\end{figure}
+
+In Figure~\ref{fig:direct_method}(B), (C) and (D), we use $40$ basis functions, but with the Gaussian width $a$ vary from $0.05$, $1$ to $2$, respectively. Since $n = 40$, and $m = 10$, the problem is very over-determined. We fix $j=1$, and consider $i=1,\ldots, 10$ in~\eqref{eq:direct}. Thus, the linear system to be solved is fully determined. The set of basis functions with the largest coverage yields the best result (see Figure~\ref{fig:direct_method}(B)), and the inversion worsens as the width of the Gaussian basis shrinks. This is to be expected since the larger the width of the Gaussians, the more overlap between the basis function located on the domain boundary and the variable coefficient defined on the interior of the domain. 
+
+
+
+
+
+%\yy{Something to discuss here}
+
+
+\clearpage
+\section{Conclusion and Discussions}\label{conclusions}
+We provided a unified framework for analyzing and discretizing certain PDE-constrained optimization problems arising in inverse problems. Here, the inverse problem is to estimate a spatially varying coefficient (i.e., the parameter) from a finite number of linear measurements of the solution of the PDE (i.e., the state). In particular, we consider constraint relaxation and show that the joint parameter-state estimation problem can be reduced to a variable-metric formulation depending on the parameter alone. This allows us to have two limiting cases, one of which yields the conventional reduced approach while the other yields a quadratic problem if the PDE is affine in the coefficient. These results are the starting point for deriving a data-driven approach, where the variable metric is replaced by one estimated from the measurements. In a few well-chosen case studies, we show how the framework can be applied and how the metric can be computed from the available measurements. In a few simple constant-coefficient cases, we can explicitly compute the solutions and metrics and confirm that the data-driven relaxation indeed yields a quadratic problem in the coefficient.
+
+The proposed framework forms a natural starting point for implementing the relaxed formulation using the finite element method. For practical implementation on large-scale problems, the matrix defining the metric (either variable or data-driven) will need to be approximated. Whether such approximations will retain the benefits of constraint relaxation will need to be investigated further. Another practical issue we leave for future investigation is the effect of noise on the data-driven metric. We furthermore expect that stronger statements about the quadratic nature of the relaxed problem can be made in specific cases, and this also is the subject of ongoing research.
+
+\section*{Acknowledgements}
+The first author thanks Gabrio Rizzuti, Felix Herrmann, and Bill Symes for the numerous fruitful discussions about this topic. We also gratefully acknowledge the Banff International Research Station for their support of the workshop \emph{New Ideas in Computational Inverse Problems} (22w5118), during which the foundations of this paper were laid.
+\clearpage
+\bibliography{ref}
+\bibliographystyle{plain}
+\clearpage
+\appendix
+\section{Auxilary results}
+\begin{lma}\label{lemma:optimality}
+Given a the functional $J : \mathsf{U}\rightarrow \mathbb{R}$ defined as
+\[
+J(q) = \sum_{i=1}^n  {\textstyle\frac{1}{2}}|\langle a_i, q \rangle_{\mathsf{U}} - b_i|^2 +  {\textstyle\frac{\rho}{2}} \|q\|_{\mathsf{U}}^2,
+\]
+where $\{a_i\}_{i=1}^n$ are linearly independent, it admits minimizers of the form
+\[
+q = \sum_{i=1}^n \overline{\alpha_i} a_i,
+\]
+where the coefficients $\boldsymbol{\alpha} \in \mathbb{C}^n$ are solved from
+\[
+\left(G + \rho I\right)\boldsymbol{\alpha} = \mathbf{b},
+\]
+with $g_{ij} = \langle a_i, a_j\rangle_\mathsf{U}$.
+\end{lma}
+\begin{proof}
+First, consider
+\[
+J(q + h) - J(q) =  {\textstyle\frac{1}{2}}\sum_{i=1}^n \left[ {2}\Re  \Big(\left(\langle a_i, q \rangle -  b_i\right)\langle h, a_i\rangle\Big) + |\langle a_i, h \rangle|^2\right] +  {\textstyle\frac{\rho}{2}}\left( {2} \Re  \langle h, q\rangle + \|h\|_\mathsf{U}^2\right)\,,
+\]
+where ``$\Re\, x $'' denotes the real part of the complex argument $x$.
+
+Note that ignoring the quadratic terms in $h$ does not give is the Fr\'echet derivative since the resulting operator is not a linear operator over $\mathbb{C}$. We address this by introducing $q = q_R + \imath q_I$ with $q_R$ and $q_I$ real-valued and considering the Frechet derivative w.r.t. $(q_R, q_I)$:
+\[
+J'(q_R,q_I;h_r,h_I) = \Re\left[\left\langle h_R, \sum_{i=1}^n \beta_i a_i + \rho q \right\rangle + \imath \left\langle h_I,\sum_{i=1}^n \beta_i a_i + \rho q \right\rangle\right],
+\]
+with $\beta_i = \overline{\langle a_i, q \rangle -  b_i}$. The optimality condition $J'(q_R, q_I; h_R, h_I) = 0 \quad \forall h_R, h_I \in \mathsf{U}_\Re$ is satisfied by letting $q$ be of the form
+\[
+q = \sum_{i=1}^n \overline{\alpha_i} a_i,
+\]
+where the coefficients $\boldsymbol{\alpha} \in \mathbb{C}^n$ can be determined by plugging this expression for $q$ back in $J$:
+\[
+J(\boldsymbol{\alpha}) =  {\textstyle\frac{1}{2}}\|G\boldsymbol{\alpha} - \mathbf{b}\|_2^2 +  {\textstyle\frac{\rho}{2}}\boldsymbol{\alpha}^*G\boldsymbol{\alpha},
+\]
+with $g_{ij} = \langle a_i, a_j\rangle_\mathsf{U}$.
+The corresponding normal equations are
+\[
+\left(G^2 + \rho G\right)\boldsymbol{\alpha} = G\mathbf{b},
+\]
+which reduces to
+\[
+\left(G+ \rho I\right)\boldsymbol{\alpha} = \mathbf{b},
+\]
+because $G$ has full rank (because $a_i$ are linearly independent).
+\end{proof}
+
+% \yy{Yunan's proof below:}
+% \begin{proof}
+% First, consider
+% \[
+% J(q + h) - J(q) =  {\textstyle\frac{1}{2}}\sum_{i=1}^n \left[ 2\Re  \Big(\left(\langle a_i, q \rangle -  b_i\right)\langle h, a_i\rangle_\mathsf{U}\Big) + |\langle a_i, h \rangle_\mathsf{U}|^2\right] +  {\textstyle\frac{\rho}{2}}\left( 2 \Re  \langle h, q\rangle_\mathsf{U} + \|h\|_\mathsf{U}^2\right)\,,
+% \]
+% where ``$\Re\, x $'' denotes the real part of the complex argument $x$. Since $J$ is quadratic in $q$, it is Fr\'echet differentiable, and $D \in \overline{\mathsf{U}^*}$ denotes its Fr\'echet derivative:
+% \[
+% D\, h =  \sum_{i=1}^n \Re  \Big(\left(\langle a_i, q \rangle_\mathsf{U}  -  b_i\right)\langle h, a_i\rangle_\mathsf{U} \Big)  + \rho \, \Re  \langle h, q\rangle_\mathsf{U}   = \Re  \left\langle h,\,\,  \sum_{i=1}^n  \overline{\left(\langle a_i, q \rangle_\mathsf{U}  -  b_i\right) }\, a_i  + \rho\, q  \right\rangle_\mathsf{U}  \,,
+% \]
+% \tvl{we have $D(h_1 + h_2) = Dh_1 + Dh_2$ but $D(\alpha h) = \Re(\alpha) Dh$, whereas linearity over the complex field would require $D(\alpha h) = \alpha D h$.} 
+% \yy{ After reading a bit, I realize there are a lot of delicate details in the definition of  differentiability! I also gained a lot from this  \href{https://math.stackexchange.com/questions/2168163/complex-differentiability-and-frechet-differentiability}{post}. Basically, our $J$ is not differentiable with respect to $q$ if we consider $q \in \mathsf{U}$. (Very suprising!!!) However, if we break $q$ into two parts, $q_R$, the real part of $q$, and $q_I$, the complex of $q$, then we are dealing with a functional that map real-valued functions to a real scalar. Everything is over the field of real numbers, so we can use our familiar techniques to handle the Frechet derivatives. Is that matching your understanding?
+% }
+
+% The first-order optimality condition is enough to ensure global optimality: Therefore, we require that $D\, h  = 0$ for any $h \in \mathsf{U}$, which is equivalent to enforcing
+% \[
+% \sum_{i=1}^n  \left(\langle a_i, q \rangle_\mathsf{U}  -  b_i\right) a_i  + \rho\, \overline{q} = 0 \,.
+% \]
+% The equation above implies that $q$ has to be a linear combination of $\{a_i\}$, in the form of
+% \[
+% q = \sum_{i=1}^n \overline{\alpha_i} \, a_i\,,
+% \]
+% where the coefficients $\boldsymbol{\alpha} = [\alpha_1,\dots, \alpha_n]^\top \in \mathbb{C}^n$ can be determined by the linear system
+% \[
+% \left(G+ \rho I\right)\boldsymbol{\alpha} = \mathbf{b}\,.
+% \]
+% The matrix $G$ is an $n \times n$ matrix with its $ij$-th entry $G_{ij} = \langle a_i, a_j \rangle_{\mathsf{U}}$, and the vector $\mathbf{b} = [b_1,\dots, b_n]^\top$. Note that $G$ has full rank because $\{a_i\}$ are linearly independent.
+% \end{proof}
+
+
+\begin{lma}\label{lemma:one}
+Given a complex-valued function $f$ and $x\in\mathbb{R}$, then
+\[
+\lim_{h\downarrow 0} \frac{f(x+h) - \overline{f(x)}}{h} = \Re f'(x).
+\]
+\end{lma}
+\begin{proof}
+Define
+\[
+F(x,y) = \frac{f(x)-\overline{f(y)}}{x - y},
+\]
+we find that $\overline{F(x,y)} = F(y,x)$ implying that $\lim_{x\rightarrow y}F(x,y) \in \mathbb{R}$. Expressing $f = f_r + \imath f_i$ we find
+\[
+F(x,y) = \frac{f_r(x)-f_r(y)}{x-y} + \imath \frac{f_i(x)+f_i(y)}{x-y}.
+\]
+Since the limiting value is in $\mathbb{R}$ the second term vanishes and we get the desired result.
+\tvl{perhaps make it more expicit by considering $F(x,y)+F(y,x)$, which is real-valued?}
+\end{proof}
+\begin{lma}\label{lemma:two}
+Given a complex-valued functions $f, g$ and $x\in\mathbb{R}$, then
+\[
+\lim_{h\downarrow 0} \frac{f(x+h)\overline{g(x)}}{h} = (f'(x)\overline{g(x)} - f(x)\overline{g'(x)})/2.
+\]
+\end{lma}
+\begin{proof}
+Introduce
+\[
+F(x,y) = \frac{f(y)\overline{g(x)}}{y-x},
+\]
+and consider
+\[
+(F(x,y) + F(y,x))/2 = \frac{f(y)\overline{g(x)} - f(x)\overline{g(y)}}{2(y-x)},
+\]
+which we can rewrite as
+\[
+(F(x,y) + F(y,x))/2 = \frac{(f(y) - f(x))\overline{g(x)} - f(x)(\overline{g(y)}-\overline{g(x)})}{2(y-x)}.
+\]
+Taking the limit $x\rightarrow y$ yields the desired result.
+\end{proof}
+
+\begin{lma}
+\label{lma:hlmholtz}
+Let 
+\[
+\mathsf{U} = \left\{ u : [0,1]\rightarrow \mathbb{C} \, \left|\, \|u\|_{\mathsf{U}} < \infty, u(0) = 0\right.\right\},
+\]
+with $\langle u, v \rangle_\mathsf{U} = \int_0^1 u'(x)\overline{v'(x)}\mathrm{d}x$ and define its dual in the usual way.  Consider the weak formulations for the forward and adjoint 1D Helmholtz equation
+\[
+\mathcal{A}_{c,k}(u(\cdot\,;\, k), \phi) = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\]
+\[
+\overline{\mathcal{A}_{c,k}(\phi, w(\cdot \,;\, k))} = \mathcal{P}(\phi)\quad \forall \phi \in \mathsf{U},
+\]
+with
+\[
+\mathcal{A}_{c,k}(u,v) = \int_0^1 u'(x) \overline{v'(x)}\mathrm{d}x - k^2 \int_0^1 c(x)^{-2}u(x) \overline{v(x)}\mathrm{d}x -\imath k c(1)^{-1}u(1)\overline{v(1)},
+\]
+\[
+\mathcal{P}(\phi) = \int_0^1 f(x)\overline{\phi(x)}\mathrm{d}x,
+\]
+for real-valued $f\in H^{-1}$. These weak formulations are well-posed \cite{Ihlenburg1997} and we have the following relation between their solutions
+\[
+w(\cdot,k) = \overline{u(\cdot,k)}.
+\]
+\end{lma}
+\begin{proof}
+First note that the adjoint solution satisfies
+\[
+\mathcal{A}_{c,k}(\phi, w(\cdot \,;\, k)) = \overline{\mathcal{P}(\phi)}\quad \forall \phi \in \mathsf{U}.
+\]
+Since we only need consider real-valued test functions, we find
+\[
+\mathcal{A}_{c,k}(\phi,w(\cdot;k)) = \mathcal{A}_{c,k}(u(\cdot;k),\phi).
+\]
+Again for real-valued $\phi$ we can easly verify that
+\[
+\mathcal{A}_{c,k}(\phi,w(\cdot;k)) = \mathcal{A}_{c,k}(\overline{w(\cdot;k)},\phi),
+\]
+implying that $\overline{w(\cdot;k)}$ is a solution of the weak form for the forward problem.
+\end{proof}
+% \section{Work in progress}
+
+% \subsection{$d$D Elliptic equation}
+% In this example we consider an ellptic PDE
+% $$c(x) u(x) - \nabla^2 u(x) = p(x), \quad x \in \Omega \subset\mathbb{R}^d,$$
+% with homogeneous Dirichlet boundary conditions. The inverse problem of estimating $c$ from measurements of $u$ for given $p$ occurs for example in reservoir characterisation \cite{Richter1981}.
+
+% \subsubsection{Weak formulation}
+% We consider real-valued functions, so $\mathcal{A}$ is bilinear and $\mathcal{P}$ is a linear operator:
+% $$\mathcal{A}(u,\phi) = \int_{\Omega} \left(c(x)u(x)\phi(x) + \nabla u(x)\cdot\nabla \phi(x)\right)\mathrm{d}x,$$
+% $$\mathcal{P}(u) = \int_{\Omega} p(x)u(x)\mathrm{d}x.$$
+% We let $\mathsf{U} = H_0^1(\Omega)$ with a weighted $H^{1}(\Omega)$-inner product:
+% $$\langle u, v\rangle_{\mathsf{U}} = \int_{\Omega} c(x)u(x)v(x) + \nabla u(x)\cdot \nabla v(x)\mathrm{d}x = \int_{\Omega} \left(c(x)u(x) - \nabla^2 u(x)\right) v(x)\mathrm{d}x.$$
+% The operator $\mathcal{P}$ is well-defined with $p \in H^{-1}(\Omega)$. We can view the Riesz map as $\mathcal{R}:H^{-1}(\Omega)\rightarrow H^{1}_0(\Omega)$, defined through solving the PDE $\left(c - \nabla^2 \right)u = p$ with homogeneous Dirichlet boundary conditions. 
+
+% \subsubsection{Data-driven kernel}
+% Because all quantities are real-valued, and $\mathcal{A}$ is symmetric we find
+% $$G_{ij} = \langle u_i, u_j\rangle_\mathsf{U}.$$
+% \yy{Should we define what $\{u_i\}$ means here? We must know the source terms they correspond to, right?}
+
+% Moreover, by the specific choice for the inner product, we have
+% $$G_{ij} = \mathcal{A}(u_i, u_j).$$
+% This yields
+% $$G_{ij} = d_{ij}.$$
+
+
+% \subsection{Helmholtz equation}
+% Here, we consider a complex-valued Helmholtz equation
+% $$
+% k^2 c(x)^{-2}u(x) + \nabla^2 u(x) = 0,\quad x \in \Omega \subset \mathbb{R}^d,
+% $$
+% with $c|_{\partial\Omega} = 1$ and boundary conditions
+% $$
+% \partial_n u(x) - \imath k u(x) = p(x), \quad x\in\partial\Omega.
+% $$
+% The inverse problem of estimating $c$ from measurements of $u$ for various source terms $p$ and frequencies $k$ occurs in applications in medical imaging and geophysics \cite{vanLeeuwen20133DFWI}.
+% \subsubsection{Weak formulation}
+% For the weak form, define
+% $$\mathcal{A}(u,v) = \int_\Omega \nabla u(x) \cdot \overline{\nabla v(x)}\mathrm{d}x - k^2\int_\Omega c(x)^{-2} u(x)\overline{v(x)}\mathrm{d}x - \imath k \int_{\partial\Omega} u(x)\overline{v(x)}\mathrm{d}x,$$
+% and
+% $$\mathcal{P}_i(u) = \int_{\partial\Omega} p_i(x)\overline{u(x)}\mathrm{d}x =  \frac{1}{|\partial\Omega_i|}\int_{\partial\Omega_i} \overline{u(k,x)}\mathrm{d}x,$$
+% i.e. $p_i$ is the indicator function of $\partial\Omega_i$. We let $\cup_i \partial\Omega_i = \partial\Omega$. The weak solution obeys
+% $$\mathcal{A}(u_i,\phi) = \mathcal{P}_i(\phi),\quad \forall \phi \in \mathsf{U},$$
+% while the adjoint solutions $w_j$ obey
+% $$\mathcal{A}(\phi,w_j) = \overline{\mathcal{P}_j(\phi)}, \quad \forall \phi \in \mathsf{U}.$$
+% This means that $w_j = \overline{u_j}$. Thus $G_{ij}= \langle w_i, w_j\rangle_\mathsf{U} = \langle u_j, u_i\rangle_\mathsf{U}$.
+
+% Measurements are given by 
+% $$d_{ij}(k) = \mathcal{P}_i(u_j(k)),$$
+% with $u_j(k)$ the solutions corresponding to $P_j$ and wavenumber $k$. Note also that 
+% $$d_{ij} = \mathcal  P_i(u_j) = \overline{\mathcal A(u_j, w_i)} = \mathcal 
+%  P_j(\overline{w_i}) =\mathcal{P}_j(u_i) = d_{ji},$$
+% showing that $d_{ij} = d_{ji}$ (reciprocity).
+
+% We let $\mathsf{U} = H^{1}(\Omega)$ and the weak form is well-posed for $p \in H^{-1/2}(\partial\Omega)$. We let
+% $$\langle u, v\rangle_\mathsf{U} = \int_\Omega \nabla u(x)\overline{\nabla v(x)}\mathrm{d}x.$$
+% We can express this as
+% $$\langle u, v\rangle_\mathsf{U} = \int_{\partial\Omega} \partial_n u(x) \overline{v(x)}\mathrm{d}x - \int_{\Omega} \nabla^2 u(x)\overline{v(x)}\mathrm{d}x,$$
+% which suggests that the Riesz map can be interpreted as $\mathcal{R}:H^{-1/2}(\partial\Omega) \rightarrow H^{1}(\Omega)$ with $\mathcal{R}(p) = u$ defined through the solution of
+% $$\nabla^2 u(x) = 0, \quad x \in \Omega$$
+% $$\partial_n u(x) = p(x), \quad x \in \partial \Omega.$$
+
+% \subsubsection{Data-driven kernel}
+% Using the weak formulation, we find the following relations between two solutions for wavenumbers $k$ and $l$:
+% $$\langle u_i(k),u_j(l)\rangle_\mathsf{U} - k^2 \langle m u_i(k), u_j(l)\rangle_{L^2(\Omega)} + \imath k \langle u_i(k), u_j(l)\rangle_{L^2(\partial\Omega)} = d_{ij}(l),$$
+% $$\langle u_j(l),u_i(k)\rangle_\mathsf{U} - l^2 \langle m u_j(l), u_i(k)\rangle_{L^2(\Omega)} + \imath l \langle u_j(l), u_i(k)\rangle_{L^2(\partial\Omega)} = d_{ji}(k),$$
+% Then
+% $$\langle u_i(k),u_j(l)\rangle_\mathsf{U} - k^2 \langle m u_i(k), u_j(l)\rangle_{L^2(\Omega)} + \imath k \langle u_i(k), u_j(l)\rangle_{L^2(\partial\Omega)} = d_{ij}(l)$$
+% $$\langle u_i(k), u_j(l)\rangle_\mathsf{U} - l^2 \langle m u_i(k),u_j(l)\rangle_{L^2(\Omega)} - \imath l \langle u_i(k),u_j(l)\rangle_{L^2(\partial\Omega)} = \overline{d_{ij}(k)}.$$
+% This yields
+% $$(l^2 - k^2)\langle u_i(k),u_j(l)\rangle_\mathsf{U} + \imath lk(l + k)\langle u_i(k), u_j(l)\rangle_{L^2(\partial\Omega)} = l^2 d_{ij}(l) - k^2 \overline{d_{ij}(k)}.$$
+% With this, we find
+% $$
+% G_{ji}(k) = \lim_{l\rightarrow k} H^1_{ji}(k,l) + H^2_{ji}(k,l),
+% $$
+% with
+% $$H_{ji}^1(k,l) =  \frac{l^2d_{ij}(l) - k^2\overline{d_{ij}(k)}}{l^2 - k^2}$$
+% $$H_{ji}^2(k,l) = - \imath k l \frac{\langle u_i(k), u_j(l)\rangle_{L^2(\partial\Omega)}}{l-k}.$$
+
+% Note that $H^1_{ji}(k,l) = H^1_{ij}(k,l)$ and $H_{ij}^2(k,l)=\overline{H^2_{ij}(l,k)}$. This suggests that $H_{ij}^1(k,k)$ is real and symmetric in $(i,j)$. Introduce $f_{ij}(\lambda) = \lambda d_{ij}(\sqrt{\lambda})$, then compute
+% $$\lim_{h\rightarrow 0} \frac{f_{ij}(\lambda + h) - \overline{f_{ij}(\lambda)}}{h} = \lim_{h\rightarrow 0} \frac{\Re f_{ij}(\lambda + h)-\Re f_{ij}(\lambda)}{h} + \imath \frac{\Im f_{ij}(\lambda + h)+\Im f_{ij}(\lambda)}{h}.$$
+% Recalling that $H^1_{ij}(k,l)$ is real-valued, we conclude that
+% $$H_{ji}^1(k,k) = \Re f_{ij}'(k^2) = \Re \left(d_{ij}(k) + (k/2) d_{ij}'(k)\right)$$
+
+% Note that $H^2_{ij}(k,l) = -\overline{H^2_{ji}(l,k)}$. Introduce $v_i(k) = k u_i(k)$ and compute
+% $$\frac{H_{ji}^2(k,l) + H_{ji}^2(l,k)}{2} = \frac{\langle v_i(k),v_j(l)\rangle - \langle v_i(l), v_j(k) \rangle}{2(k-l)}.$$
+% With $k = l+h$ we compute
+% $$H_{ji}^2(l,l) = \lim_{h\rightarrow 0} \frac{\langle v_i(l+h), v_j(l)\rangle - \langle v_i(l), v_j(l+h)\rangle}{2h}$$
+% we can express this as
+% $$H_{ji}^2(l,l) = \lim_{h\rightarrow 0} \frac{\langle v_i(l+h) - v_i(l), v_j(l)\rangle - \langle v_i(l), v_j(l+h) - v_j(l)\rangle}{2h}$$
+% thus
+% $$H_{ji}^2(l,l) = \frac{\langle v_i'(l), v_j(l)\rangle - \langle v_i(l), v_j'(l)\rangle}{2} = l^2\frac{\langle u_i'(l), u_j(l)\rangle - \langle u_i(l), u_j'(l) \rangle}{2}.$$
+
+% Approximating the solutions on the boundary as piecewise constant functions on the invervals $\Omega_i$, we can approximate the boundary integral in terms of the boundary measurements as
+% $$\langle u_i'(k), u_j(k)\rangle_{L^2(\partial\Omega)} \approx \sum_\ell \overline{d_{\ell i}'(k)}d_{\ell j}(k).$$
+% $$\langle u_i(k), u_j'(k)\rangle_{L^2(\partial\Omega)} \approx \sum_\ell \overline{d_{\ell i}(k)}d_{\ell j}'(k).$$
+
+
+% \clearpage
+% \section{Algorithms}
+% Choosing $\mathsf{\mathsf{U}} = \text{span}\{\phi_i\}_{i=1}^m$, $\mathsf{\mathsf{C}} = \text{span}\{\psi_i\}_{i=1}^\ell$ and expressing the coefficients as $c = \sum_{i=1}^\ell c_i \psi_i$, we get the following discrete analogue of \eqref{eq:eFWI2}
+% \begin{equation}\label{eq:eFWI_fnt}
+% \min_{\mathbf{c}, Q} {\textstyle\frac{1}{2}}\|P^\top\!A(\mathbf{c})^{-1}B(\mathbf{c})Q - E(\mathbf{c})\|_F^2 + {\textstyle{ {\textstyle\frac{\rho}{2}}}} \text{trace}(Q^\top\!B(\mathbf{c})Q),
+% \end{equation}
+% with $P_{ij} = \mathcal{P}_j(\phi_i)$, $A(\mathbf{c})_{ij} = \mathcal{A}_c(\phi_j, \phi_i)$ representing the PDE and sampling operator, $B(\mathbf{c})_{ij} = \langle \phi_i, \phi_j\rangle_\mathsf{U}$ accounting for the choice of basis and function space, $\mathbf{c}\in\mathbb{R}^{\ell}$ representing the coefficients, the columns of $Q \in \mathbb{R}^{m\times n}$ represent the auxiliary source terms, and $E(\mathbf{c}) = D - P^\top\!A(\mathbf{c})^{-1}P$. The corresponding reduced problem reads
+% \begin{equation}\label{eq:rdcd_fnt}
+% \min_{\mathbf{c}} {\textstyle\frac{1}{2}} \text{trace}\left(E(\mathbf{c})^*\!\left(I + \rho^{-1}G(\mathbf{c})\right)^{-1}\!E(\mathbf{c})\right),
+% \end{equation}
+% with $G(\mathbf{c}) = P^\top\!A(\mathbf{c})^{-1}B(\mathbf{c})A(\mathbf{c})^{-*}P$. 
+% %\yy{We may not assume $G(c)$ since the derivative will be complicated. In the past, $B(c)$ is not parameter-dependent.} 
+% Note that $B$ may depend on the coefficient, depending on the inner product that is chosen.
+% \begin{rem}
+% \label{rem:two}
+% If we consider
+% \[
+% J(\mathbf{c}) = {\textstyle{\frac{1}{2\rho}}} \text{trace}\left(E(\mathbf{c})^*\!\left(I + \rho^{-1}G(\mathbf{c})\right)^{-1}\!E(\mathbf{c})\right),
+% \]
+% and consider the case where $P$ is invertible and let $\rho\downarrow 0$, we find
+% \[
+% J(\mathbf{c}) \approx {\textstyle\frac{1}{2}} \text{trace}
+% \left(\left( A(\mathbf{c})P^{-*}D - P\right)^*B(\mathbf{c})^{-1}\left(A(\mathbf{c})P^{-*}D - P\right)\right).
+% \]
+% Thus, if $A$ is affine in $\mathbf{c}$ and $B$ is independent of $\mathbf{c}$, this yields a quadratic problem in $\mathbf{c}$. We can readily construct $P$ to be invertible if we choose the basis for $\mathsf{U}$ appropriately. Of course, this will have effect on the accuracy of the discretisation of the underlying PDE.
+% \end{rem}
+
+% Next, we present three approaches to solving this optimization problem based on a basic gradient-descent update:
+% \[
+% \mathbf{c}^{(k+1)} = \mathbf{c}^{(k)} - \alpha \mathbf{g}^{(k)}.
+% \]
+% While we can treat \eqref{eq:rdcd_fnt} as a non-linear optimization problem and compute the required derivatives of the objective with respect to $\mathbf{c}$, we instead explore some alternatives that are more practical in implementation.
+
+% For all the algorithms below we need to first compute the following quantities. Starting from the current iterate $\mathbf{c}^{(k)}$, compute
+% \[
+% U^{(k)} = A(\mathbf{c}^{(k)})^{-1}P,
+% \]
+% \[
+% V^{(k)} = A(\mathbf{c}^{(k)})^{-*}P,
+% \]
+% with which we can compute
+% \[
+% E^{(k)} = D - P^\top\!U^{(k)},
+% \]
+% \[
+% H^{(k)} = \left(I + \rho^{-1}G^{(k)}\right)^{-1},
+% \]
+% \[
+% G^{(k)} = \left(V^{(k)}\right)^*B^{(k)}V^{(k)},
+% \]
+% and thereby the value of the objective in \eqref{eq:rdcd_fnt}. Next, we compute the update $\mathbf{g}^{(k)}$ according to the expressions below.
+% \subsection{Algorithm 1: Conventional Reduced Approach} As a benchmark, we treat the conventional approach in which the residual weight is approximated as
+% \[
+% \left(I + \rho^{-1}G(\mathbf{c})\right)^{-1} \approx I,
+% \]
+% which becomes exact as $\rho\rightarrow \infty$. The update direction is then given by
+% \begin{equation}\label{eq:grad1}
+% g_i^{(k)} = -\text{trace}\left(  \left(U^{(k)}\right)^* \left(\partial_{c_i}A^{(k)}\right)^*V^{(k)}E^{(k)}\right).
+% \end{equation}
+% where $\partial_{c_i}A^{(k)}$ is the derivative of $A(\mathbf{c}^{(k)})$ with respect to $c_i$.
+% \subsection{Algorithm 2: Reweighted Least-Squares}
+% A better approximation of the weight matrix can be obtained by using the previous iterate. The update is then given by
+% \begin{equation}\label{eq:grad2}
+% g_i^{(k)} = -\text{trace}\left(  \left(U^{(k)}\right)^* \left(\partial_{c_i}A^{(k)}\right)^*V^{(k)}H^{(k-1)}E^{(k)}\right).
+% \end{equation}
+
+% \subsection{Algorithm 3: Data-driven}
+% We can compute the residual weight directly from the measurements
+% \[
+% \widetilde{H} = \left(I + \rho^{-1}\widetilde{G}\right)^{-1},
+% \]
+% with $\widetilde{G}$ an approximation of the weight matrix obtained from the measurements. This leads to the following update
+% \begin{equation}\label{eq:grad3}
+% g_i^{(k)} = -\text{trace}\left(  \left(U^{(k)}\right)^* \left(\partial_{c_i}A^{(k)}\right)^*V^{(k)}\widetilde{H}E^{(k)}\right).
+% \end{equation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%NUMERICAL EXAMPLES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \clearpage
+% \section{Numerical examples}
+% See \url{https://github.com/TristanvanLeeuwen/DataDrivenInversion}
+% %See https://fenicsproject.org/olddocs/dolfinx/dev/python/demos/poisson/demo_poisson.py.html
+
+% %https://knowledgebase.acoustics.ac.uk/tutorials/fem/fenicsx-helmholtz-tutorial.html
+
+% %https://jsdokken.com/dolfinx-tutorial/
+
+% %https://github.com/FEniCS/dolfinx#installation
+% \subsection{1D Helmholtz}
+\clearpage
+\section{An Alternative Perspective}
+In this section, we present an alternative perspective for which we can interpret the constraint-relaxation formulation~\eqref{eq:eFWI} as a change of objective function in the optimization problem. Before moving forward, we clarify a few notations: $\langle f_1, f_2 \rangle = \int f_1 \overline{f_2} \, \rd x$, i.e., the dual pairing with $f_1 \in \U, f_2 \in \V:= \U^*$ , while $\langle \cdot, \cdot \rangle_\U$ and $\langle \cdot, \cdot \rangle_\V$ are the inner products in $\U$ and $\V$ spaces, respectively. Finally, $\|\cdot\|_\U$ and $\|\cdot\|_\V$ are the corresponding norms.
+
+
+We formulate the PDE-constrained optimization problem as
+ \begin{equation}\label{eq:eFWI_2}
+ \min_{c\in \mathsf{C},u\in\U^n} \frac{1}{2} \sum_{i,j=1}^{n}   \big|\langle \mathcal{P}_i, u_j\rangle - d_{ij}\big|^2 +  \frac{\rho}{2} \sum_{j=1}^n  \|\mathcal{L}(c)u_j - \cP_j\|_\V^2 ,
+ \end{equation}
+with $\mathcal{L}(c): \U  \rightarrow \V$ the PDE-operator with coefficient $c$,   $u = (u_1, u_2, \ldots, u_n)$ the states, $\cP_i$ representing the source terms and measurement operators, $d_{ij}$ the measurements and $\rho > 0$ a trade-off parameter. Earlier in~\eqref{eq:eFWI}, we used $\mathcal{P}_i(u_j)$ to denote $\langle \mathcal{P}_i, u_j\rangle $, and the former notation treats $\mathcal{P}_i$ as an antilinear operator acting on $\U$.
+
+
+The states $\{u_j\}$ are elements of a normed Hilbert space $\U$,  while the source terms $\{p_j\} \subset \V$. One can consider the adjoint of $\mathcal{L}(c)$ denoted by $\cL^*(c) :  \U \rightarrow \V$. That is,
+\[
+\langle\cL(c) u_1, u_2\rangle = \langle  u_1, \cL^*(c) u_2 \rangle,\qquad \forall u_1, u_2 \in  \U\,.
+\]
+
+Note that $\mathcal{L}(c)$ is not the forward operator that maps the unknown coefficient $c$ to the observed data, and that $\mathcal{L}(c)$ has a well-defined inverse, denoted by $\mathcal{L}(c)^{-1}: \V\rightarrow \U$. Similarly, the inverse of the adjoint operator, $(\mathcal{L}(c)^{*})^{-1}$ exists.
+
+Similar to~\eqref{eq:eFWI2}, through a change of variable, we can formulate~\eqref{eq:eFWI_2} in terms of an extended source. 
+%Let 
+% \[
+% q_j = \cR \left(\mathcal{L}(c)u_j - \cP_j \right), \qquad  1\leq j \leq n, 
+% \]
+% be the source mismatch between the real source $\cP_j$ and the simulated source $ \mathcal{L}(c)u_j $. We then have
+\begin{equation}\label{eq:eFWI_22}
+\min_{c, q}  \frac{1}{2}  \sum_{i,j=1}^{n} \big|\left\langle \cP_i, \, \mathcal{L}(c)^{-1}  \cR ^{-1} q_j \right\rangle - e_{ij} \big|^2 + \frac{\rho}{2}\sum_{j=1}^n \|q_j\|_\U^2.
+\end{equation}
+
+
+
+
+% \subsection{The representer theorem}
+% %both~\eqref{eq:eFWI} and~\eqref{eq:eFWI2} are reduced to an inner problem, which is a quadratic optimization with respect to $u$ and $r$, respectively. Next, we show the two inner problems have a finite-dimensional representation.
+
+% We first introduce a few notations. 
+When the parameter $c$ is fixed, we will drop the dependence of $\mathcal{L}$ on $c$ and use the short-hand notation $\mathcal{L}^{-*}$ for $(\mathcal{L}^{*})^{-1}$. Moreover, the operator $\cL^*\cR \cL: \U\rightarrow \V$ is given via
+\[
+\langle \cL u_1, \cL u_2 \rangle_\V = \langle  u_1, \cL^*\cR \cL u_2 \rangle_{\U,\V},\quad \forall u_1, u_2 \in \U,
+\]
+where $\cR: \V \rightarrow \U$ is the (antilinear) Riesz map, and $\langle \cdot , \cdot \rangle_{\U,\V}$ denotes the dual pairing between the dual space $\U = \V^*$ and $\V$. %For simplicity, we will use   $\langle  \cdot , \cdot \rangle$ to denote the dual pairing, and $\langle  \cdot , \cdot \rangle_{U}$ or $\langle  \cdot , \cdot \rangle_{V}$ for the inner product in $U$ and $V$ spaces, respectively.
+
+Define the error term 
+$$e_{ij} = d_{ij} - \langle \cP_i, \mathcal{L}^{-1} \cP_j\rangle\qquad i,j = 1,\ldots, n\,.$$  
+We define $\mathcal I$ as the identity operator and the linear operator $\mathcal M: \U \rightarrow \U$ by
+\begin{equation}\label{eq:M}
+      \mathcal M u = \sum_{i=1}^n   \langle \mathcal{L}^{-*} \cP_i, u \rangle_{\U} \, \mathcal{L}^{-*} \cP_i,
+\end{equation}
+whose range is the finite-dimensional subspace of $\U$ spanned by the function basis $\{\mathcal{L}^{-*} \cP_i\}_{i=1}^n$. 
+Note that $\cM$ is a self-adjoint linear operator from $\U$ to $\U$ and has a spectral decomposition $\mathcal{M} = \mathcal{C}_M^* \mathcal{C}_M$ with   $\cC_M: \U \rightarrow \mathbb{R}^n$ and $\cC_M^*: \mathbb{R}^n\rightarrow  \U$ where 
+\begin{eqnarray}
+    \mathcal{C}_M u &=&  [\langle  \mathcal{L}^{-*}  \cP_1, u\rangle_{\U}  ,\, \ldots, \, \langle \mathcal{L}^{-*}   \cP_i, u\rangle_{\U} ,\, \ldots, \, \langle \mathcal{L}^{-*}   \cP_n, u\rangle_{\U} ]^\top,\quad \forall u\in \U, \label{eq:cm}
+    \\
+    \mathcal{C}_M^* \boldsymbol{\eta} &=& \sum_{i=1}^n \eta_i\,  \mathcal{L}^{-*} \cP_i,\quad \forall \boldsymbol{\eta} \in \mathbb{R}^n. \label{eq:cm_star}
+\end{eqnarray}
+Using notations in~\cite{townsend2015continuous}, $\cC_M$ and $\cC_M^*$  satisfy the definition of a quasimatrix, in which one  index  of  a  rectangular  matrix  becomes  continuous  while  the  other  remains  discrete. Similar, $\cM$ is referred to as a ``cmatrix'', denoting the compact linear operator from $\U$ to $\U$. Accordingly, we can also define $\widetilde{\mathcal{M} } = \mathcal{M} \mathcal{R}: \V \rightarrow  \U$, and $\widetilde{\mathcal{M} } = \mathcal{C}_M^* \mathcal{C}_M \mathcal{R}$.
+
+Similarly, we can define another linear operator $\mathcal{N}: \V \rightarrow \V$ as
+\begin{equation}\label{eq:N}
+  \mathcal N v = \sum_{i=1}^n   \langle  \cP_i, v\rangle_{\V} \cP_i.
+\end{equation}
+The range of the self-adjoint operator $\cN$ is the subspace of $\V$ spanned by the function basis $\{\cP_i\}_{i=1}^n$. We can also write $\mathcal N   = \mathcal{C}_N^*  \mathcal{C}_N$ with  $\cC_N: \V \rightarrow \mathbb{R}^n$ and $\cC_N^*: \mathbb{R}^n \rightarrow \V$ where 
+\begin{eqnarray*}
+    \mathcal{C}_N v &=&  [\langle  \cP_1, v\rangle_{\V} ,\, \ldots, \, \langle  \cP_i, v\rangle_{\V}  ,\, \ldots, \, \langle   \cP_n, v\rangle_{\V}  ]^\top,\quad \forall v\in \V, \\
+        \mathcal{C}_N^* \boldsymbol{\eta} &=& \sum_{i=1}^n \eta_i \,  \cP_i,\quad \forall  \boldsymbol{\eta} \in \mathbb{R}^n. 
+\end{eqnarray*}
+It is clear that $\cC_N = \cC_M \cR \cL \cR$ and thus 
+$$\cM = \cL^{-*} \cN (\cR \cL\cR)^{-1}.$$
+We remark that $\cC_N, \cC_N^*$ are quasimatrices and $\cN$ is a cmatrix.
+
+\begin{thm}[Another Representer Theorem]
+\label{thm:Representer_2}
+For a fixed parameter $c$ and a constant $\rho > 0$, the optimization problem~\eqref{eq:eFWI_22} has a close-form solution for $q_j$, $1\leq j \leq n$, which has a finite-dimensional representation
+\[
+q_j^* =   \sum_{i=1}^n e_{ij} \left(\rho \mathcal{R} + \mathcal M \mathcal R \right)^{-1} \mathcal{L}^{-*} \cP_i.
+\]
+Similarly, through a change of variable, we have a finite-dimensional representation for $u_j$ in~\eqref{eq:eFWI}:
+\[
+u_j^* = \mathcal{L}^{-1} \cP_j  + \sum_{i=1}^n e_{ij}    \left( \rho \mathcal{L}^*\cR \mathcal{L}+ \mathcal N \cR^{-1} \right)^{-1}   \cP_i .
+\]
+\end{thm}
+
+\begin{proof}
+The optimization problem~\eqref{eq:eFWI2} can be re-written as 
+\[
+\min_{c,r} \sum_{j=1}^n J_j(c, q_j),\quad J_j(c, q_j) = \frac{1}{2} \sum_{i=1}^n \big| \langle \cP_i, \mathcal{L}^{-1} q_j\rangle - e_{ij} \big|^2 + \frac{\rho}{2} \|q_j\|_V^2 .
+\]
+We fix the parameter $c$ in the derivation below. If for any fixed $j$, $q^*_j$ is the minimizer for $J_j$, then we have $\{q_j\}$ as the optimizer of~\eqref{eq:eFWI_22}. Next, we compute $q^*_j$. Since $J_j$ is quadratic in $q_j$, it is sufficient to study the first-order optimality condition
+\[
+ 0 = \frac{\delta J_j}{\delta q_j} = \sum_{i=1}^n \left(\langle \mathcal{L}^{-*}\cP_i, q_j\rangle - e_{ij} \right) \mathcal{L}^{-*}\cP_i + \rho\, \mathcal{R} q_j \in  \U,
+\]
+where $\mathcal{R}: \V \rightarrow  \U$ is the Riesz map. The first-order optimality condition has the solution
+\[
+q_j^* =   \sum_{i=1}^n e_{ij} \left(\rho \mathcal{R}  + \widetilde{\mathcal M} \right)^{-1} \mathcal{L}^{-*} \cP_i = \left(\rho \mathcal{R}  + \mathcal M  \mathcal{R} \right)^{-1}  \mathcal{C}_M^* 
+{\mathbf{e}}_j = \mathcal{R}^{-1} \left(\rho \mathcal{I}  + \mathcal{C}_M^* \mathcal{C}_M \right)^{-1}  \mathcal{C}_M^* 
+{\mathbf{e}}_j  , 
+\]
+with  ${\mathbf{e}}_j = [e_{1j},\ldots,e_{nj}]^\top$ and $\mathcal{M}$ given in~\eqref{eq:M}.
+
+It is not hard to show that $u_j^* = \mathcal{L}^{-1} \left(\cP_j + q^*_j \right)$ is the optimal solution to~\eqref{eq:eFWI}. Thus, we have
+\begin{eqnarray}
+u_j^* &=&  \mathcal{L}^{-1} \cP_j + \sum_{i=1}^n e_{ij}  \mathcal{L}^{-1}  \left(\rho \cR + \mathcal M  \cR \right)^{-1}  \mathcal{L}^{-*} \cP_i  \nonumber \\
+&=&   \mathcal{L}^{-1} \cP_j  + \sum_{i=1}^n e_{ij}    \left( \rho 
+ \mathcal{L}^*\cR \mathcal{L}+ \mathcal{L}^* \mathcal M \cR\mathcal{L} \right)^{-1}   \cP_i  \nonumber \\
+&=&   \mathcal{L}^{-1} \cP_j  + \sum_{i=1}^n e_{ij}    \left( \rho \mathcal{L}^* \cR \mathcal{L}+ \mathcal N  \cR^{-1} \right)^{-1}   \cP_i   \nonumber \,,
+% &=&   \mathcal{L}^{-1} \cP_j  +   \left( \rho \mathcal{L}^* \cR \mathcal{L}+ \mathcal{C}_N^*  \mathcal{C}_N \right)^{-1}   \mathcal{C}_N^* {\mathbf{e}}_j,
+\end{eqnarray}
+with $\mathcal{N}$ given in~\eqref{eq:N}.
+\end{proof}
+\begin{rem}
+Next, we consider two limiting cases. In the limit of $\rho \rightarrow \infty$,  the data-fitting term (i.e., the first term) in~\eqref{eq:eFWI} is dropped. The solution $u_j = \mathcal{L}(c)^{-1} \cP_j$ for $j=1,\ldots, n$ coupled with any fixed $c$ is a global minimum to the joint optimization problem~\eqref{eq:eFWI}, which then have infinitely many solutions. On the other hand, when $\rho =0$, the model-fitting term  (i.e., the second term) in~\eqref{eq:eFWI} disappears. However, the two linear operators $\mathcal{M}: \U\rightarrow \U$ and $\mathcal{N}: \V\rightarrow \V$ are not necessarily invertible since they map the (infinite-dimensional) space $\U$ or $\V$ onto a finite-dimensional subspace of $\U$ or $\V$, spanned by $\{\cL^{-*}\cP_i\}_{i=1}^n \subset U$ and $\{\cP_i\}_{i=1}^n \subset V$, respectively. In this case, even for a fixed $c$, we have infinitely many solutions, $u_j^*$ for a fixed $j$, given that $\U$ is infinite-dimensional. The representer theorem no longer holds.
+\end{rem}
+
+Next, we present a corollary which further simplify the representation of $u_j^*$.
+\begin{cor}\label{col:simple_Representer}
+For any fixed $c$ and $\rho > 0$, the solutions $u_j^*$ to \eqref{eq:eFWI} are of the form 
+\[
+u_j^* = \mathcal{L}^{-1}\cP_j + \sum_i \alpha_{ij} (\mathcal{L}^*\cR \mathcal{L})^{-1} \cP_j.
+\]
+Correspondingly, the solutions $q_j^*$ to \eqref{eq:eFWI2} are of the form
+\[
+q_j^* = \sum_i \alpha_{ij} \cR^{-1} \mathcal{L}^{-*}\cP_j,
+\]
+where $\cR^{-1}: \U \rightarrow \V$ is the inverse Riesz map.
+\end{cor}
+\begin{proof}
+First, we introduce variables $\{w_i\}\subset \U$ such that
+$$u_j^* = \mathcal{L}^{-1}\cP_j + \sum_i e_{ij} (\rho \mathcal{L}^* \cR \mathcal{L} + \cN \cR^{-1})^{-1}\cP_i = \mathcal{L}^{-1}\cP_j + \sum_i e_{ij}w_i\,,$$ where for any $i=1,\ldots,n$,
+$$
+(\rho \mathcal{L}^*\cR \mathcal{L} + \mathcal{N}\cR^{-1})w_i = \cP_i.
+$$
+Recall that $\mathcal{N}\cR^{-1}w_i = \sum_l \langle \cP_l, \cR^{-1}w_i  \rangle_{\V} \, \cP_l$. We then find 
+$$
+\mathcal{L}^* \cR \mathcal{L} w_i = \rho^{-1} \cP_i - \rho^{-1} 
+ \sum_l \langle \cP_l, \cR^{-1}w_i  \rangle_{\V} \, \cP_l = \sum_l \gamma_{li} \, \cP_l.
+$$
+The coefficients $\{\gamma_{li}\}_{l=1}^n$ depends on $w_i$. This implies that  $ w_i = \sum_{l} \gamma_{li}  (
+ \mathcal{L}^* \cR \mathcal{L})^{-1} \cP_l$. Plugging $w_i$ back in to the explicit form of $u_j^*$, we obtain
+$$
+u_j^* = \mathcal{L}^{-1}\cP_j + \sum_{i,l=1}^n e_{ij} \gamma_{li} (\mathcal{L}^*\cR \mathcal{L})^{-1}\cP_l = \mathcal{L}^{-1}\cP_j + \sum_{l=1}^n \alpha_{jl} (\mathcal{L}^*\cR \mathcal{L})^{-1}\cP_l.
+$$
+
+Note that the coefficients $\{\alpha_{jl}\}$ are not known a-priori. This result only indicates that $u_j^*$ can, in principle, be represented as a linear combination of $\{(\mathcal{L}^* \cR \mathcal{L})^{-1} \cP_l \}_{l=1}^n$ and hence in which subspace this solution lies. 
+
+The expression for $r_j^*$ follows immediately from the definition $q_j = \mathcal{L}u_j - \cP_j$.
+\end{proof}
+
+
+
+\subsection{A New Objective Function}
+\begin{thm}[A reduced formulation]
+\label{thm:newthm2}
+The extended FWI problem \eqref{eq:eFWI_2} in $(c, u)$ can be formulated equivalently in reduced form as
+\begin{equation}
+\min_c \frac{1}{2} \sum_{j=1}^n\|\mathbf{e}_j(c)\|_{(I+\rho^{-1}N(c))^{-1}}^2,
+\end{equation}
+with
+${\mathbf{e}}_j(c) = [e_{1j}(c),\ldots,e_{nj}(c)]^\top$ and $N \in \mathbb{R}^{n\times n}$ defined as
+\begin{eqnarray}
+N_{ik}(c) &=&  \langle \mathcal{L}(c)^{-*} \cP_i,\, \cR^{-1} \mathcal{L}(c)^{-*} \cP_k \rangle =  \langle \mathcal{L}(c)^{-*} \cP_i,\, \mathcal{L}(c)^{-*} \cP_k\rangle_U .
+\end{eqnarray}
+\end{thm}
+\begin{proof}
+Following from the proof of Theorem~\ref{thm:Representer_2},
+at this particular $q_j^*$, the minimum of the inner loss 
+\begin{equation}\label{eq:J_j}
+J_j(c,q_j^*) = \frac{1}{2} \| {\mathbf{e}}_j \|_2^2 - \frac{1}{2} {\mathbf{e}}_j \cdot  M {\mathbf{e}}_j =  \frac{1}{2} {\mathbf{e}}_j \cdot \left(I+  \rho^{-1} N \right)^{-1} {\mathbf{e}}_j , 
+\end{equation}
+where ${\mathbf{e}}_j = [e_{1j},\ldots,e_{nj}]^\top$, $I$ is the $n\times n$ identity matrix, and $M \in \mathbb{R}^{n\times n}$ is a matrix with the $ik$-th entry as
+\begin{eqnarray*}
+M_{ik} &=&   \langle \mathcal{L}^{-*} \cP_i , \,\, \left(\rho \mathcal{I} + \mathcal M \right)^{-1}  \mathcal{L}^{-*} \cP_k \rangle\,,
+\end{eqnarray*}
+and the matrix $N$ given in~\eqref{eq:new_obj}.
+
+The first equality in~\eqref{eq:J_j} is a direct calculation. Next, we justify the second equality in~\eqref{eq:J_j}. To begin with, we  represent the linear action induced by matrices $M$ and $N$ through the linear operators used earlier defined over various function spaces: $\forall \boldsymbol{\eta}\in \mathbb{R}^n$, 
+\begin{eqnarray*}
+M\boldsymbol{\eta} &=& \cC_M \left( \rho \mathcal{I} + \mathcal M\right)^{-1} \cC_M^* \boldsymbol{\eta},\\
+N\boldsymbol{\eta} &=& \cC_M \cC_M^* \boldsymbol{\eta}. 
+\end{eqnarray*}
+It is straightforward to check the above since we can recover every entry of the matrices $M$ and $N$: $M_{ij} = \mathbf{b}_i \cdot  M \mathbf{b}_j$ and $N_{ij} = \mathbf{b}_i \cdot  N \mathbf{b}_j$ with $\{\mathbf{b}_i \}_{i=1}^n$ being the standard basis in $\mathbb{R}^n$.
+
+The celebrated Sherman--Morrison--Woodbury formula for the inverse of matrices can also be generalized to linear operators~\cite{deng2011generalization}. We used it to deduce a simpler form for $J_j$ which justifies the last equality in~\eqref{eq:J_j}.
+\begin{eqnarray*}
+\left(I - M \right)^{-1} &=& \left( I -  \cC_M \left( \rho \mathcal{I} + \mathcal M\right)^{-1} \cC_M^*\right)^{-1}\\
+&=& I + \cC_M \left( \rho \mathcal{I} + \mathcal M - \cC_M^* \cC_M\right)^{-1} \cC_M^*\\
+&=& I + \rho^{-1} \cC_M \mathcal{I}^{-1} \cC_M^* \\
+&=& I + \rho^{-1} N.
+\end{eqnarray*}
+% It is not difficult to check that $(I - M)^{-1} = I + \rho^{-1} N$, where $I$ is the $n\times n$ identity matrix.
+\end{proof}
+\begin{rem}
+Earlier in~Theorem~\ref{thm:Representer}, we used $w_i$ to denote the adjoint solution with source $\cP_i$. Here, we have that $w_i = \cL^{-*} \cP_i$, $i=1,\ldots,n$. Moreover, the result in~\Cref{thm2} coincides with the one in~\Cref{thm:newthm2}.
+\end{rem}
+
+
+\subsection{State-dependent metric}
+Assume the linear operator $\mathcal{L}$ is nice (\yy{needs to find out what is needed here}, the objective function in~\eqref{eq:new_obj} is equivalent to measuring the data misfit $\{{\bf e}_j\}$ using a state-dependent metric $g_c$, rather than the common Euclidean distance:
+\begin{equation} \label{eq:old_obj}
+\min_c \frac{1}{2} \sum_{j=1}^n\|\mathbf{e}_j(c)\|_{2}^2 .
+\end{equation}
+
+The metric between any two $\mathbb{R}^n$ vectors, ${\bf a}_i$ and  ${\bf a}_j$, is induced  by the inner product $g_c$ given by
+\begin{equation}\label{eq:g_inner_product}
+    g_c \left( {\bf a}_i, {\bf a}_j \right)  = { \bf a}_i \cdot \left( I + \rho^{-1} N(c) \right)^{-1} {\bf a}_j.
+\end{equation}
+Since we assume that $\{\cP_i\}$ are linearly independent, $N(c)$ has full rank and is thus invertible. Recall that $N(c) = \cC_M(c) \cC_M^*(c)$. Its inverse takes the form
+\begin{equation*}
+    N^{-1}(c) =   \left(\cC_M^* (c) \right)^\dagger \cC_M(c)^\dagger,
+\end{equation*}
+where $\cC_M^\dagger(c): \mathbb{R}^n \rightarrow \U$ denotes the Moore--Penrose inverse of the quasimatrix $\cC_M(c):\U\rightarrow \mathbb{R}^n$ such that $\cC_M(c) \cC_M^\dagger(c) = {I}$, the identity matrix in $\bbR^n$. It is easy to check that  
+\begin{equation}\label{eq:cm_daggers}
+\cC_M^\dagger = \cC_M^* N^{-1}, \quad \text{and}\quad  \left(\cC_M^*\right)^{\dagger} = N^{-1}\cC_M.
+\end{equation}
+
+The inner product in~\eqref{eq:g_inner_product} is a regularized version of
+\[
+\hat{g}_c  \left( {\bf a}_i, {\bf a}_j \right)  := { \bf a}_i \cdot   N(c)^{-1} {\bf a}_j =  \langle \cC_M(c) ^\dagger {\bf a}_i \,,\,  \cC_M(c) ^\dagger {\bf a}_j\rangle_{\U} \,,
+\]
+based on which, the inner product $\hat{g}_c  \left( {\bf a}, {\bf a} \right)$ returns the squared $\|\cdot \|_\U$ norm of $\cC_M^\dagger(c) { \bf a}$, the orthogonal projection of ${ \bf a} \in \mathbb{R}^d$ onto the $\text{span}\{\cL^{-1}\cP_1,\ldots, \cL^{-1}\cP_n \} \subset \U$. 
+
+This step can be interpreted as ``lifting'' the data misfit $\{
+{\bf e}_j\}$ from the space of discrete measurements to the continuous PDE solution space through $\{ \cC_M(c)^\dagger{\bf e}_j\}$, which lie in the range of the solution operator $\cL^{-1}$, also a subspace of $\U$. We then compute the $\|\cdot\|_\U$ norm of the \textit{lifted} data misfit. We use Figure~\ref{fig:norm_finite} and Figure~\ref{fig:infinite_diagram} to illustrate the case of a finite number of measurements and the continuous case where the measurement operator  $P: \U\rightarrow \ell^2$, $P = \{\cP_i\}_{i=1}^\infty$, is compact and invertible.
+
+The weighting matrix $\left( I + \rho^{-1} N(c) \right)^{-1} $ here is the \textit{harmonic mean} between the identity matrix $I$ and $\rho N(c)^{-1}$. Assume that $N^{-1}$ has eigenvalues values $\sigma_1\leq \sigma_2 \leq \ldots \leq \sigma_n$. Then the matrix $(I + \rho^{-1} N(c))^{-1}$ has eigenvalues in a decreasing order 
+\[
+\frac{\sigma_1}{\sigma_1 + \rho^{-1}}\leq \frac{\sigma_2}{\sigma_2 + \rho^{-1}} \leq \ldots \leq \frac{\sigma_n}{\sigma_n + \rho^{-1}}.
+\]
+As a result, $I+\rho^{-1} N(c)$ has a smaller condition number than $N(c)$ and is more stable to invert.
+
+
+
+\begin{figure}
+    \centering
+\begin{tikzpicture}[scale = 1.1]
+\draw[smooth cycle,tension=1] plot coordinates{(-2,-0.2) (-1.5,2) (2.5,2.2) (2.6,-0.2)};
+\draw[smooth cycle,tension=1] plot coordinates{(6.5,-0.2) (7.3,3) (11,2.9) (10.8,-0.2)};
+\fill  
+(-0.25,0.6) circle (1.5pt) node[above ]{$d_1$} 
+(0,0.1) circle (1.5pt) node[right] {$d_2$} 
+(-2,0.1) node[right] {$\mathbb{R}^n$} 
+(7.85,1.75) circle (1.5pt) node[below] {$\cC_M(c)^{\dagger}d_1$} 
+(8,0.75) circle (1.5pt) node[below] {$\cC_M(c)^{\dagger}d_2$}
+(10.1,2) node[right] {$\U$};
+% (-1.5,3) node[right]
+% {$R = \cC_M(c)^{\dagger}$ };
+\path[->, thick](1, 2) edge [out=45,in=135] node[above] {$\cC_M(c)^{\dagger}$ in~\eqref{eq:cm_daggers}}(7, 2);
+\path[<-, thick](1.5, 1.9) edge [out=45,in=135] node[below] {$\cC_M(c)$ in~\eqref{eq:cm}}(6.5, 1.9);
+% \draw[black] (1.5,1) node[above]{$(\calP, d_p)$};
+% \draw[black] (6.7,1.1) node[above]{$(\calD, d_o)$};
+\draw [black,thick,fill=red, opacity=0.2] (8,0.9) circle (1.5);
+\draw [black,thick,fill=blue, opacity=0.2] (0.2,0.6) circle (1.0);
+\draw[arrows = {-Stealth[scale width=2]}] (0,-1.5) -- (10,-1.5);
+\draw  (0,-2) node {$\rho = 0$};
+\draw  (10,-2) node {$\rho = \infty$};
+\draw  (5,-2) node {$0<\rho<\infty$};
+\draw (5,-2.5) node {interpolate the two metrics};
+\end{tikzpicture}
+    \caption{Rather than only comparing the $\ell^2$ distance between $d_1$ and $d_2$, where $d_1  = P u_1$, $d_2 = Pu_2$, with $Pu := [\mathcal{P}_1(u),\ldots, \mathcal{P}_n(u)]^\top$, we also compare the $\ell^2$ distance  between $\cC_M(c)^{\dagger}d_1$ and $\cC_M(c)^{\dagger}d_2$ in $\U$, where $\mathcal{L}$ is the PDE operator, $\cC_M(c)$ and $\cC_M(c)^\dagger$ are given in~\eqref{eq:cm} and~\eqref{eq:cm_daggers}, respectively. The red area represents the lifted space, $\text{span}\{\cL^{-*}\cP_1,\ldots, \cL^{-*}\cP_n\} \subset \U$. \label{fig:norm_finite}}
+    %, $\mathcal{L}^{-*} P = [\mathcal{L}^{-*} \mathcal{P}_1,\ldots, \mathcal{L}^{-*} \mathcal{P}_n] = QR$, with $R\in \mathbb{R}^{n\times n}$, $Q = [q_1,\ldots q_n]$, $\langle q_i, q_j\rangle_{\mathsf{U}} = \delta_{ij}$. Here, $Q^* Q = I$, the identity matrix in $\mathbb{R}^{n}$.} 
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{tikzpicture}[scale = 1.1]
+\draw[smooth cycle,tension=1] plot coordinates{(-2,-0.2) (-1.5,2) (2.5,2.2) (2.6,-0.2)};
+\draw[smooth cycle,tension=1,fill=red, opacity=0.2] plot coordinates{(6.5,-0.2) (7.3,3) (11,2.9) (10.8,-0.2)};
+\fill  
+(-0.25,0.6) circle (1.5pt) node[above ]{$d_1$} 
+(0,0.1) circle (1.5pt) node[right] {$d_2$} 
+(-2,0.1) node[right] {$\ell^2$} 
+(7.85,1.75) circle (1.5pt) node[below] {$\cC_M(c)^{-1} d_1$} 
+(8,0.75) circle (1.5pt) node[below] {$\cC_M(c)^{-1} d_2$};
+% (10.1,2) node[right] {$\mathbb{R}^n$} ;
+\path[->, thick](1, 2) edge [out=45,in=135] node[above] {$\cC_M(c)^{\dagger} =\cC_M(c)^{-1}$}(7, 2);
+\path[<-, thick](1.5, 1.9) edge [out=45,in=135] node[below] {}(6.5, 1.9);
+\fill (4.1, 2.8) node[below] {$\cC_M(c): \U \rightarrow \ell^2$}
+(10.1,2) node[right] {$\U$};
+% \draw[black] (1.5,1) node[above]{$(\calP, d_p)$};
+% \draw[black] (6.7,1.1) node[above]{$(\calD, d_o)$};
+% \draw [black,thick,fill=red, opacity=0.2] (8,0.9) circle (1.5);
+\draw [black,thick,fill=blue, opacity=0.2] (0.2,0.6) circle (1.0);
+\draw[arrows = {-Stealth[scale width=2]}] (0,-1.5) -- (10,-1.5);
+\draw  (0,-2) node {$\rho = 0$};
+\draw  (10,-2) node {$\rho = \infty$};
+\draw  (5,-2) node {$0<\rho<\infty$};
+\draw (5,-2.5) node {interpolate the two metrics};
+\end{tikzpicture}
+    \caption{In the continuous limit ($n\rightarrow \infty$), assume that the measurement becomes an infinite sequence in $\ell^2$ and $\cC_M(c)$ is invertible. That is, $\text{span}\{\cL^{-*}\cP_i\}_{i=1}^\infty$ forms a basis for the space $\U$. The classic method uses $\|d_1-d_2\|_{\ell^2}^2$ as the objective function. The proposed method also compares the  distance  between $\|\cC_M(c)^{-1}d_1 - \cC_M(c)^{-1}d_2\|_\U^2$. The red area in this case is the entire space $\U$, representing the lifted space.} 
+    \label{fig:infinite_diagram}
+\end{figure}
+
+\subsection{Contributions - OLD}
+This work presents a data-driven approach for PDE-constrained optimization in inverse problems. We built on the work presented in \cite{van2015penalty} where the PDE-constrained problem is posed as a joint parameter-state estimation problem which enforces the PDE-constraints only approximately. Effectively, we lift the search space from the pure parameter to a much larger joint parameter-state space to mitigate the non-linearity of the optimization problem~\cite{fang2020lift}. Concretely, we pose it as estimating coefficients $c$ from given data by solving
+\begin{equation}\label{eq:main1}
+\min_{c,u_1, \ldots, u_m} {\textstyle{\frac{1}{2}}}\sum_{i=1}^m\|\mathfrak{P}u_i - \mathbf{d}_i\|_2^2 +  {\textstyle{\frac{\rho}{2}}}\|\mathcal{L}(c)u_i - \mathfrak{R}^{-1}p_i\|_\mathsf{V}^2,
+\end{equation}
+where $\mathcal{L}(c):\mathsf{U}\rightarrow\mathsf{V} = \mathsf{U}^*$ denotes the partial differential operator with coefficient $c$, $\mathfrak{R}:\mathsf{V}\rightarrow\mathsf{U}$ is the Riesz map between these two Hilbert spaces, $\mathfrak{P}:\mathsf{U}\rightarrow \mathbb{R}^m$ denotes the linear sampling operator:
+\[
+\mathfrak{P}u = (\langle p_1, u\rangle_\mathsf{U}, \ldots, \langle p_m, u\rangle_\mathsf{U}),
+\]
+where $\{p_i\}_{i=1}^m$ are the Riesz representations of the sampling operator, $\mathbf{d}_i = \mathfrak{P}u^*_i$ represents the observed data for the $i^\text{th}$ source corresponding to the underlying true state ${u}^*_i = \mathcal{L}({c}^*)^{-1}\mathfrak{R}^{-1}p_i$ obtained with the true parameter ${c}^*$, and $\rho > 0$ is a penalty parameter. It has been shown empirically that this reformulation can improve the optimization landscape, making the iterative process less sensitive to initialisation, and hence leading to more robust inversion results~\cite{van2015penalty}. We innovate upon this previous work in the following three directions.  %\yy{Since we deal with complex numbers later, I suggest reserve $\bar{\ }$ for complex conjugate. Maybe we use $u_i^*$ and $c^*$ to denote the truth?}
+\tvl{I'm not very fond of the font used here for $\mathfrak{P}$ and $\mathfrak{R}$, and perhaps we can do away with the Riesz map from the start, stating that we assume sufficient regularity?}
+First, we treat the original optimization problem~\eqref{eq:main1} in the continuous setting and thereby provide a common framework for analysis and numerical implementation of a wide range of inverse problems based on the weak form of the PDE. Considering a finite number of measurements, we present a Representer Theorem (see \Cref{thm:Representer}) which shows that the estimated state lives in a finite-dimensional subspace of $\mathsf{U}$. This leads to a re-formulation of the traditional reduced approach for PDE-constrained optimization with an objective function equipped with a \textit{parameter-dependent residual weight}. In particular, when $\U = \V = L^2$ over $\mathbb{R}$ \tvl{is it clear that you mean real-valued functions here, rather than 1D PDEs?}, it simplifies to
+\[
+\min_c  J(c):={\textstyle{\frac{1}{2}}}\sum_{i=1}^m\|\mathfrak{P}\mathcal{L}(c)^{-1} p_i - \mathbf{d}_i\|_{(I + \rho^{-1} G(c))^{-1}}^2,
+\]
+where $G(c) = \mathfrak{P} \left(\mathcal{L}(c)^{*}\mathcal{L}(c)\right)^{-1}\mathfrak{P}^*$. 
+
+Second, based on the Representer Theorem, we analyze the two limiting cases, and endow this finite-dimensional linear algebra form with a rich equivalent interpretation in terms of functional analysis. We discover that the relaxed formulation~\eqref{eq:main1} embodies the rich interplay between
+\begin{itemize}
+    \item the finite-dimensional data residual $\mathfrak{P}\mathcal{L}(c)^{-1}p_i - \mathbf{d}_i$,
+    \item the solution residual $\mathcal{L}(c)^{-1}p_i - u^*_i$,
+    \item the PDE residual  $p_i - \mathcal{L}(c)u_i^*$.
+\end{itemize}
+In the limit of $\rho\rightarrow \infty$, the objective function above reduces back to the conventional formulation, measuring the \emph{data-residual} in the $\ell^2$-norm.  If $G(c)$ is invertible, we can informally consider the limit of $\rho\rightarrow 0$ to arrive at a formulation in which the residual is weighted by $G(c)^{-1}$, which is parameter-dependent. In other words, when there is no noise in the measurement, we have:
+\begin{itemize}
+\item[$\rho\rightarrow \infty$:] $J(c)$ measures the $\|\cdot \|_{\mathsf{U}}$ norm of the \emph{solution-residual}, which corresponds to a weighted projection of $\left(\mathcal{L}(c)^{-1} - \mathcal{L}({c}^*)^{-1}\right)p_i$ on $\mathsf{P}_m 
+ = \text{span}\{p_i\}_{i=1}^m\subset \mathsf{U}$. If $\{p_i\}_{i=1}^m$ is an orthonormal basis, then the projection is also an orthogonal projection.
+ 
+\item[$\rho\rightarrow 0$:\,\,\,] $J(c)$ measures the $\|\cdot \|_{\mathsf{U}}$ norm of the \emph{PDE-residual}, which corresponds to the orthogonal projection of $\mathcal{L}(c){u}
+^*_i - p_i = (\mathcal{L}(c) - \mathcal{L}({c}^*)){u}^*_i\in \mathsf{U}$ on $\mathsf{W}_m = \text{span}\{w_i\}_{i=1}^m \subset \mathsf{U}$ with $w_i = \mathcal{L}(c)^{-*}p_i$.
+\end{itemize}
+For a finite $\rho > 0$, the objective function is interpolating between these two limiting situations. This is schematically depicted in Figure \ref{fig:one}.
+
+
+% , we can reinterpret this as an orthogonal projection of the \emph{PDE-residual} $\mathcal{R}\mathcal{L}(c){u}
+% ^*_i - p_i = \mathcal{R}(\mathcal{L}(c) - \mathcal{L}({c}^*)){u}^*_i\in \mathsf{U}$ on $\mathsf{W}_m = \text{span}(\{w_i\}_{i=1}^m) \subset \mathsf{U}$ with $w_i = \mathcal{L}(c)^{-*}\mathcal{R}^{-1}p_i$. Indeed, the corresponding projection operator is given by $\Pi_{\mathsf{W}_m} = \mathcal{L}(c)^{-*}\mathcal{P}^*G(c)^{-1}\mathcal{P}\mathcal{L}(c)^{-1}$, from which we can verify that $\|\Pi_{\mathsf{W}_m}(\mathcal{L}(c)\overline{u}_i - \mathcal{R}^{-1}p_i)\|_\mathsf{U} = \|\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i - \mathbf{d}_i\|_{G^{-1}}$.
+  One might argue that it is more natural to measure the data-fit in the transformed space, through the map $\mathcal{L}(c)$, because the PDE-residual is typically affine in the coefficient $c$ for many common inverse problems, such as Calder\'on problem~\cite{uhlmann2009electrical}, full-waveform inversion~\cite{van2015penalty} and inverse scattering~\cite{cakoni2005qualitative} Precisely, in the $\rho\rightarrow 0$ case, under certain conditions, we can prove that the optimization problem is convex with respect to $c$ (see Corollary~\ref{thm:quadratic}), while the original objective function (when $\rho \rightarrow \infty$) is known to be highly nonconvex, for all the examples mentioned above. Here, we only use the special case of $\U = L^2$ to motivate our study, and we will work with the general function spaces in the rest of the paper.
+
+% \begin{tikzcd} 
+% \left(\mathcal{L}(c)^{-1} - \mathcal{L}({c}^*)^{-1}\right)\mathcal{R}^{-1}p_i\arrow[d,"\mathcal{P}"]\arrow[r,"\mathcal{R}\mathcal{L}(c)"]&\mathcal{R}\left(\mathcal{L}({c}^*)-\mathcal{L}(c)\right){u}^*_i\arrow[d,"G^{-1/2}\mathcal{P}\mathcal{L}^{-1}\mathcal{R}^{-1}"]\\ 
+% \mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i - \mathbf{d}_i&G(c)^{-1/2}\left(\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i - \mathbf{d}_i\right)\\
+% \boxed{\text{The limit of } \rho \rightarrow \infty}  & \boxed{\text{The limit of } \rho \rightarrow 0}
+% \end{tikzcd}
+%%%%%%%%%%%%%%%
+% below is the more general case with a general Riesz map
+% \begin{figure}
+% \begin{tikzcd} 
+% \text{solution residual}\arrow[r,"\mathcal{R}\mathcal{L}(c)"] &  \text{PDE residual}  \\
+% \left(\mathcal{L}(c)^{-1} - \mathcal{L}({c}^*)^{-1}\right)\mathcal{R}^{-1}p_i\arrow[d,"\text{projection over $\mathsf{P}_m$}"]\arrow[r,"\mathcal{R}\mathcal{L}(c)"]&\mathcal{R}\left(\mathcal{L}({c}^*)-\mathcal{L}(c)\right){u}^*_i\arrow[d,"\text{orthogonal projection over $\mathsf{W}_m$}"]\\ 
+% \|\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i - \mathbf{d}_i\|_{\ell^2}&\|\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i - \mathbf{d}_i\|_{G(c)^{-1}}\\
+% \boxed{\text{The limit of } \rho \rightarrow \infty}  & \boxed{\text{The limit of } \rho \rightarrow 0}
+% \end{tikzcd}
+% \caption{\label{fig:one}
+% The two limiting cases of the residual between simulated ($\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i$) and measured ($\mathbf{d}_i = \mathcal{P}\mathcal{L}({c}^*)^{-1}\mathcal{R}^{-1}p_i$) data. When $\rho\rightarrow\infty$, we measure the $\ell^2$ norm of the data-residual, which corresponds to a projection of the data residual $\left(\mathcal{L}(c)^{-1} - \mathcal{L}({c}^*)^{-1}\right)\mathcal{R}^{-1}p_i$ on $\mathsf{P}_m = \text{span}(\{p_i\}_{i=1}^m)$, while when $\rho\rightarrow 0$ we measure the $G^{-1}(c)$-weighted data-residual in the $\ell^2$-norm, which corresponds to a projection of the PDE residual $\mathcal{R}\left(\mathcal{L}(c)-\mathcal{L}({c}^*)\right){u}^*_i$ on  $\mathsf{W}_m = \text{span}\{w_i\}_{i=1}^m \subset \mathsf{U}$ with $w_i = \mathcal{L}(c)^{-*}\mathcal{R}^{-1}p_i$.
+% }
+
+% \end{figure}
+\begin{figure}
+\begin{tikzcd} 
+\text{solution residual}\arrow[r,"\mathcal{L}(c)"] &  \text{PDE residual}  \\
+\left(\mathcal{L}(c)^{-1} - \mathcal{L}({c}^*)^{-1}\right)p_i\arrow[d,"\text{projected length over $\mathsf{P}_m$}"]\arrow[r,"\mathcal{L}(c)"]&\left(\mathcal{L}({c}^*)-\mathcal{L}(c)\right){u}^*_i\arrow[d,"\text{projected length over $\mathsf{W}_m$}"]\\ 
+\|\mathfrak{P}\mathcal{L}(c)^{-1}p_i - \mathbf{d}_i\|_{\ell^2}&\|\mathfrak{P}\mathcal{L}(c)^{-1}p_i - \mathbf{d}_i\|_{G(c)^{-1}}\\
+\boxed{\text{The limit of } \rho \rightarrow \infty}  & \boxed{\text{The limit of } \rho \rightarrow 0}
+\end{tikzcd}
+\caption{
+The two limiting cases of the residual between simulated ($\mathfrak{P}\mathcal{L}(c)^{-1}p_i$) and measured ($\mathbf{d}_i = \mathfrak{P}\mathcal{L}({c}^*)^{-1}p_i$) data. When $\rho\rightarrow\infty$, we measure the $\ell^2$ norm of the \emph{data residual}  ($\mathfrak{P}\mathcal{L}(c)^{-1}p_i - \mathbf{d}_i$) , which corresponds to the projected length of the \emph{solution residual} $\mathcal{L}(c)^{-1}p_i - \mathcal{L}({c}^*)^{-1}p_i$ on $\mathsf{P}_m = \text{span}(\{p_i\}_{i=1}^m)\subset \mathsf{U}$. When $\rho\rightarrow 0$, we measure the \emph{$G(c)^{-1}$-weighted data residual} ($\mathfrak{P}\mathcal{L}(c)^{-1}p_i - \mathbf{d}_i$) in the $\ell^2$-norm, which corresponds to the projected length of the \emph{PDE residual} $\left(\mathcal{L}(c)-\mathcal{L}({c}^*)\right){u}^*_i$ on  $\mathsf{W}_m = \text{span}\{w_i\}_{i=1}^m \subset \mathsf{U}$ with $w_i = \mathcal{L}(c)^{-*}p_i$. This is based on a special case of $\U = \V = L^2$ over $\bbR$.
+}
+
+\end{figure}
+
+% \begin{figure}
+% \centering
+% \begin{tikzpicture}[scale = 1.1]
+% \draw[smooth cycle,tension=1] plot coordinates{(-2,-0.2) (-1.5,2) (2.5,2.2) (2.6,-0.2)};
+% \draw[smooth cycle,tension=1] plot coordinates{(6.5,-0.2) (7.3,3) (11,2.9) (10.8,-0.2)};
+% \fill  
+% (-0.25,0.6) circle (1.5pt) node[above ]{$d_1$} 
+% (0,0.1) circle (1.5pt) node[right] {$d_2$} 
+% (-2,0.1) node[right] {$\mathbb{R}^m$} 
+% (7.85,1.75) circle (1.5pt) node[below] {$\cC(c)^{\dagger}d_1$} 
+% (8,0.75) circle (1.5pt) node[below] {$\cC(c)^{\dagger}d_2$}
+% (10.1,2) node[right] {$\U$};
+% % (-1.5,3) node[right]
+% % {$R = \cC_M(c)^{\dagger}$ };
+% \path[->, thick](1, 2) edge [out=45,in=135] node[above] {$\cC(c)^{\dagger}$}(7, 2);
+% \path[<-, thick](1.5, 1.9) edge [out=45,in=135] node[below] {$\cC(c)$}(6.5, 1.9);
+% % \draw[black] (1.5,1) node[above]{$(\calP, d_p)$};
+% % \draw[black] (6.7,1.1) node[above]{$(\calD, d_o)$};
+% \draw [black,thick,fill=red, opacity=0.2] (8,0.9) circle (1.5);
+% \draw [black,thick,fill=blue, opacity=0.2] (0.2,0.6) circle (1.0);
+% \draw[arrows = {-Stealth[scale width=2]}] (0,-1.5) -- (10,-1.5);
+% \draw  (0,-2) node {$\rho = 0$};
+% \draw  (10,-2) node {$\rho = \infty$};
+% \draw  (5,-2) node {$0<\rho<\infty$};
+% \draw (5,-2.5) node {interpolate the two metrics};
+% \end{tikzpicture}
+% \caption{For a given coefficient $c$ and underlying true states $\{\overline{u}_i\}_{i=1}^m$, we either compute the distance between $\mathcal{P}\mathcal{L}(c)^{-1}\mathcal{R}^{-1}p_i$ and $\mathcal{P}\overline{u}_i$ in $\mathbb{R}^m$ (for $\rho \rightarrow \infty$) or the distance between $\mathcal{L}(c)\overline{u}_i$ and $\mathcal{R}^{-1}p_i$ in $\mathsf{W}_m$ (for $\rho=0$). For finite $\rho > 0$ we interpolate between these two cases.\label{fig:one}}
+% \end{figure}
+
+As a third contribution, in addition to this reformulation, we show through a series of case studies how this residual weight can be estimated from the data directly if the underlying space $\mathsf{U}$ is chosen appropriately. It turns out that this construction is closely related to the work on data-driven reduced order models pioneered by \cite{Borcea2018,Borcea2020,borcea2022waveform}. %The main gist is to express the $m \times m$ data matrix as $D = \mathcal{P}\mathcal{L}({c}^*)^{-1}\mathcal{P}^*$ for some true coefficient ${c}^*$ and realise that for well-chosen $\mathcal{R}$, we can compute $G({c}^*)$ from $D$. Indeed, for an elliptic PDE, we could set $\mathcal{R} = \mathcal{L}^{-1}$ and directly find $G({c}^*) = D$. For hyperbolic equations, we cannot directly use this construction. In case we have multi-spectral measurements, e.g., a Helmholtz equation with $\mathcal{L}(c) = k^2\mathcal{I} + \Delta_c$, we can set $\mathcal{R} = \Delta_c^{-1}$ and get $G({c}^*)=D(k)+(k^2/2)D'(k)$. Thus, we see an interesting interplay between the underlying space $\mathsf{U}$ and the ability to derive data-driven formulations. The ability to estimate $G({c}^*)$ from the data also opens up the ability to directly estimate ${c}^*$ as follows. 
+% \yy{I am lost for the paragraph below.}
+% Interpreting $G$ as the Gram matrix of the internal states ${W}^* = ({w}^*_1, \ldots, {w}^*_m)$ corresponding to the true coefficient ${c}^*$, we can estimate these adjoint states as $W = W^{(0)}R$, where $W^{(0)} = (w_1^{(0)}, \ldots, w_m^{(0)})$ contains an orthogonal basis for $\text{span}(\{w_i^{(0)}\}_{i=1}^m)$ \yy{lost here.} obtained by solving the adjoint PDE for a reference coefficient $c^{(0)}$ and $R$ is obtained from a Cholesky decomposition of $G$ \cite{Borcea2020}. With the estimated states, we can then proceed to estimate the coefficient by solving $\mathcal{L}(c)^*W\approx\mathcal{P}$ for $c$. 
+Thus, this work bridges the gap between PDE-constrained optimization and data-driven reduced-order models and opens up an avenue for efficient implementation of the relaxed formulation.
+
+
+\end{document}

@@ -1,0 +1,707 @@
+\documentclass{amsart}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm,xcolor}
+\usepackage{hyperref}
+\usepackage{refcheck}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\rd}{\mathrm{d}}
+
+\newcommand{\yy}[1]{\textcolor{blue}{{YY: #1}}}
+\newcommand{\tvl}[1]{\textcolor{purple}{{TvL: #1}}}
+
+\newtheorem{thm}{Theorem}
+\newtheorem{cor}{Corollary}
+\newtheorem{rem}{Remark}
+\newtheorem{lma}{Lemma}
+
+\title{A data-driven approach to extended FWI}
+\author{Tristan van Leeuwen and Yunan Yang}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+\begin{itemize}
+\item Intro on FWI, non-linearity
+\item Overview of model-extensions
+\item Overview of data-driven approaches
+\end{itemize}
+
+\subsection{Approach}
+\begin{itemize}
+\item Extended FWI in infinite-dimensional setting
+\item Representer theorem for finite data
+\item model-dependent norm on residual in FWI (kernel)
+\item get kernel from data
+\end{itemize}
+% We formulate the PDE-constrained optimization problem as
+%  \begin{equation}
+%  \label{eq:eFWI}
+%  \min_{c,u} \sum_{i,j=1}^{n}\left((\langle p_i, u_j\rangle - d_{ij})^2 + \rho \|L(c)u_i - p_i\|^2\right),
+%  \end{equation}
+% with $L(c)$ the PDE-operator with coefficient $c$, $u = (u_1, u_2, \ldots, u_n)$ the states, $p_i$ representing the source terms and measurement operators, $d_{ij}$ the measurements and $\rho > 0$ a trade-off parameter. The solution of the inner problem for $u$ can be represented as
+% $$u_i(x) = g_i(x) + \sum_{j=1}
+% ^n w_{ij} k_j(x),$$
+% with $Lg_i(x) = p_i(x)$ and $L^*L k_i(x) = p_i(x)$.
+% \yy{Is this an ansatz??? I think so. This implicitly says that we are searching for the solution in this particular basis.}
+% \tvl{No, this follows from the representer theorem; solutions to \eqref{eq:eFWI} in terms of $u$ are of this form}
+
+% This allows us the write the inner problem as a finite-dimensional optimization problem for the coefficients $w_{ij}$. Since this problem is quadratic and admits a unique solution, we can eliminate the states and express \eqref{eq:eFWI} as
+% $$\min_c \sum_i\|\mathbf{r}_i(c)\|_{(I+\rho^{-1}K(c))^{-1}}^2,$$
+% with $\mathbf{r}_i = (\langle p_1, g_i\rangle - d_{1i}, \ldots, \langle p_n, g_i - d_{ni}\rangle)$ and $K_{ij}  = \langle p_i, k_j\rangle$.
+%  Moreover, we find $K_{ij} = \langle Lk_i, Lk_j\rangle=\langle \overline{g}_i,\overline{g}_j\rangle$ with $L^* \overline{g}_i = p_i$. \yy{As long as $\{p_i\}$ form a basis, and $L^*$ is invertible, we have full-rankness of $K$ (thus invertible).} \tvl{I agree.} Following [cite] we can express this quantity in terms of the measurements $d_{ij}$ and replace the variable kernel $K(c)$ by the kernel corresponding to the true coefficients.
+ 
+\subsection{Contributions and outline}
+\begin{itemize}
+\item finite-dimensional reformulation of infinite-dimensional extended FWI through representer theorem
+\item kernel-weighted FWI
+\item get kernel from data
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEORY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Theory}
+In this section we present the main results. First, we present the extended FWI problem as unconstrained optimization over an extended search space consisting of coefficients $c$ and wavefields $\{u_i\}_{i}$, and an equivalent reformulation in terms of coefficients $c$ and sources $\{r_i\}_i$. Then, we present a Representer Theorem, which expresses the solution of the optimization problem over wavefields or sources as a finite linear combination of basis functions. Using this representation, we then reduce the extended FWI problem to an unconstrained optimization problem over the coefficients only. In particular, we show that extended FWI is equivalent a conventional FWI with a coefficient-dependent weight on the residuals.
+\tvl{Perhaps we can introduce a few abstract function spaces here to keep track of regularity of sources, wavefields, etc.}
+\subsection{Extended FWI}
+We formulate the PDE-constrained optimization problem as
+ \begin{equation}\label{eq:eFWI}
+ \min_{c,u} \frac{1}{2} \sum_{i,j=1}^{n}   \big|\langle p_i, u_j\rangle - d_{ij}\big|^2 +  \frac{\rho}{2} \sum_{j=1}^n  \|\mathcal{L}(c)u_j - p_j\|_V^2 ,
+ \end{equation}
+with $\mathcal{L}(c): U\rightarrow V$ the PDE-operator with coefficient $c$,   $u = (u_1, u_2, \ldots, u_n)$ the states, $p_i$ representing the source terms and measurement operators, $d_{ij}$ the measurements and $\rho > 0$ a trade-off parameter. The states $\{u_j\}$ are elements of a normed Hilbert space $U$,  while the source terms $\{p_j\} \subset V$ which is another normed Hilbert space and $\|\cdot \|_V$ denotes the norm in $V$. Here, we further assume that $U$ and $V$ are dual spaces, i.e., $U^* = V$ and $V^* = U$. Thus, one can consider the adjoint of $\mathcal{L}(c)$ denoted by $\cL^*(c) : U \rightarrow V$. Note that $\mathcal{L}(c)$ is not the forward operator that maps the unknown coefficient $c$ to the observed data, and that $\mathcal{L}(c)$ has a well-defined inverse, denoted by $\mathcal{L}(c)^{-1}: V\rightarrow U$.
+
+Alternatively, through a change of variable, we can formulate~\eqref{eq:eFWI} in terms of an extended source. Let 
+\[
+r_j = \mathcal{L}(c)u_j - p_j, \qquad  1\leq j \leq n, 
+\]
+be the source mismatch between the real source $p_j$ and the simulated source $ \mathcal{L}(c)u_j $. We then have
+\begin{equation}
+\label{eq:eFWI2}
+\min_{c, r}  \frac{1}{2}  \sum_{i,j=1}^{n} \big|\left\langle p_i, \mathcal{L}(c)^{-1}  r_j \right\rangle - e_{ij} \big|^2 + \frac{\rho}{2}\sum_{j=1}^n \|r_j\|_V^2,
+\end{equation}
+where $e_{ij} = d_{ij} - \langle p_i ,\cL(c)^{-1} p_j\rangle$. \yy{Maybe $p_i$ can be delta and RKHS?}
+
+Before moving forward, we clarify a few notations: $\langle f_1, f_2 \rangle = \int f_1 f_2 \, \rd x$ denotes $L^2$ inner product, i.e., the dual pairing with $f_1, f_2$ belonging to the prime and the dual spaces, respectively, while $\langle \cdot, \cdot \rangle_U$ and $\langle \cdot, \cdot \rangle_V$ are the inner products in $U$ and $V$ spaces, respectively. Finally, $\|\cdot\|_U$ and $\|\cdot\|_V$ are the corresponding norms.
+
+\subsection{A representer theorem}
+When the parameter $c$ is fixed, both~\eqref{eq:eFWI} and~\eqref{eq:eFWI2} are reduced to an inner problem, which is a quadratic optimization with respect to $u$ and $r$, respectively. Next, we show the two inner problems have a finite-dimensional representation.
+
+We first introduce a few notations. We drop the dependence of $\mathcal{L}$ on $c$ here and use the short-hand notation $\mathcal{L}^{-*}$ for $(\mathcal{L}^{*})^{-1}$. Moreover, the self-adjoint operator $\cL^*\cR \cL: U\rightarrow V$ is defined via
+\[
+\langle \cL u_1, \cL u_2 \rangle_V = \langle  u_1, \cL^*\cR \cL u_2 \rangle_{U,V},\quad \forall u_1, u_2 \in U,
+\]
+where $\cR: V \rightarrow V^*$ is the Riesz map that maps an element in $V$ to an element in the dual space $V^*$, and $\langle  \cdot , \cdot \rangle_{U,V}$ denotes the dual pairing between the dual space $U = V^*$ and $V$. %For simplicity, we will use   $\langle  \cdot , \cdot \rangle$ to denote the dual pairing, and $\langle  \cdot , \cdot \rangle_{U}$ or $\langle  \cdot , \cdot \rangle_{V}$ for the inner product in $U$ and $V$ spaces, respectively.
+
+Define the error term 
+$$e_{ij} = d_{ij} - \langle p_i, \mathcal{L}^{-1} p_j\rangle\qquad i,j = 1,\ldots, n\,.$$  
+We define $\mathcal I$ as the identity operator and the linear operator $\mathcal M: V \rightarrow U$ by
+\begin{equation}\label{eq:M}
+      \mathcal M v = \sum_{i=1}^n   \langle \mathcal{L}^{-*} p_i, v \rangle \, \mathcal{L}^{-*} p_i,
+\end{equation}
+whose range is the finite-dimensional subspace of $U$ spanned by the function basis $\{\mathcal{L}^{-*} p_i\}_{i=1}^n$. 
+Note that $\cM$ is a self-adjoint linear operator from $V$ to $U$ and has a spectral decomposition $\mathcal{M} = \mathcal{C}_M^* \mathcal{C}_M$ with   $\cC_M: V \rightarrow \mathbb{R}^n$ and $\cC_M^*: \mathbb{R}^n\rightarrow V^* = U$ where 
+\begin{eqnarray*}
+    \mathcal{C}_M v &=&  [\langle  \mathcal{L}^{-*}  p_1, v\rangle ,\, \ldots, \, \langle \mathcal{L}^{-*}   p_i, v\rangle ,\, \ldots, \, \langle \mathcal{L}^{-*}   p_n, v\rangle ]^\top,\quad \forall v\in V,\\
+    \mathcal{C}_M^* \boldsymbol{\eta} &=& \sum_{i=1}^n \eta_i\,  \mathcal{L}^{-*} p_i,\quad \forall \boldsymbol{\eta} \in \mathbb{R}^n.
+\end{eqnarray*}
+Using notations in~\cite{townsend2015continuous}, $\cC_M$ and $\cC_M^*$  satisfy the definition of a quasimatrix, in which one  index  of  a  rectangular  matrix  becomes  continuous  while  the  other  remains  discrete. Similar, $\cM$ is referred to as a ``cmatrix'', denoting the compact linear operator from $V$ to $U$. 
+
+Similarly, we can define another linear operator $\mathcal{N}: U \rightarrow V$ as
+\begin{equation}\label{eq:N}
+  \mathcal N u = \sum_{i=1}^n   \langle  p_i, u\rangle p_i.
+\end{equation}
+The range of the self-adjoint operator $\cN$ is the subspace of $V$ spanned by the function basis $\{p_i\}_{i=1}^n$. We can also write $\mathcal N   = \mathcal{C}_N^*  \mathcal{C}_N$ with  $\cC_N: U \rightarrow \mathbb{R}^n$ and $\cC_N^*: \mathbb{R}^n \rightarrow U^* = V$ where 
+\begin{eqnarray*}
+    \mathcal{C}_N u &=&  [\langle  p_1, u\rangle ,\, \ldots, \, \langle  p_i, u\rangle ,\, \ldots, \, \langle  p_n, u\rangle ]^\top,\quad \forall u\in U, \\
+        \mathcal{C}_N^* \boldsymbol{\eta} &=& \sum_{i=1}^n \eta_i \,  p_i,\quad \forall  \boldsymbol{\eta} \in \mathbb{R}^n. 
+\end{eqnarray*}
+It is clear that $\cC_M = \cC_N \cL^{-1}$ and thus 
+$$\cM = \cL^{-*} \cN \cL^{-1}.$$
+We remark that $\cC_N, \cC_N^*$ are quasimatrices and $\cN$ is a cmatrix.
+
+\begin{thm}[A Representer Theorem]
+\label{thm:Representer}
+For a fixed parameter $c$ and a constant $\rho > 0$, the optimization problem in~\eqref{eq:eFWI2} has a close-form solution for $r_j$, $1\leq j \leq n$, which has a finite-dimensional representation
+\[
+r_j^* =   \sum_{i=1}^n e_{ij} \left(\rho \mathcal{R} + \mathcal M \right)^{-1} \mathcal{L}^{-*} p_i.
+\]
+Similarly, through a change of variable, we have a finite-dimensional representation for $u_j$ in~\eqref{eq:eFWI}:
+\[
+u_j^* = \mathcal{L}^{-1} p_j  + \sum_{i=1}^n e_{ij}    \left( \rho \mathcal{L}^*\cR \mathcal{L}+ \mathcal N \right)^{-1}   p_i .
+\]
+\end{thm}
+
+\begin{proof}
+The optimization problem~\eqref{eq:eFWI2} can be re-written as 
+\[
+\min_{c,r} \sum_{j=1}^n J_j(c, r_j),\quad J_j(c, r_j) = \frac{1}{2} \sum_{i=1}^n \big| \langle p_i, \mathcal{L}^{-1} r_j\rangle - e_{ij} \big|^2 + \frac{\rho}{2} \|r_j\|_V^2 .
+\]
+We fix the parameter $c$ in the derivation below. If for any fixed $j$, $r^*_j$ is the minimizer for $J_j$, then we have $\{r_j\}$ as the optimizer of~\eqref{eq:eFWI2}. Next, we compute $r^*_j$. Since $J_j$ is quadratic in $r_j$, it is sufficient to study the first-order optimality condition
+\[
+ 0 = \frac{\delta J_j}{\delta r_j} = \sum_{i=1}^n \left(\langle \mathcal{L}^{-*}p_i, r_j\rangle - e_{ij} \right) \mathcal{L}^{-*}p_i + \rho\, \mathcal{R} r_j \in  U,
+\]
+where $\mathcal{R}: V \rightarrow V^* = U$ is the Riesz map such that $\langle R v, v' \rangle =\langle v, v' \rangle_V$ for any $v,v' \in V$.
+
+
+The first-order optimality condition has the solution
+\[
+r_j^* =   \sum_{i=1}^n e_{ij} \left(\rho \mathcal{R}  + \mathcal M \right)^{-1} \mathcal{L}^{-*} p_i = \left(\rho \mathcal{R}  + \mathcal{C}_M^* \mathcal{C}_M \right)^{-1}  \mathcal{C}_M^* 
+{\mathbf{e}}_j, 
+\]
+with  ${\mathbf{e}}_j = [e_{1j},\ldots,e_{nj}]^\top$ and $\mathcal{M}$ given in~\eqref{eq:M}.
+
+It is not hard to show that $u_j^* = \mathcal{L}^{-1} \left(p_j + r^*_j \right)$ is the optimal solution to~\eqref{eq:eFWI}. Thus, we have
+\begin{eqnarray}
+u_j^* &=&  \mathcal{L}^{-1} p_j + \sum_{i=1}^n e_{ij}  \mathcal{L}^{-1}  \left(\rho \cR + \mathcal M \right)^{-1}  \mathcal{L}^{-*} p_i  \nonumber \\
+&=&   \mathcal{L}^{-1} p_j  + \sum_{i=1}^n e_{ij}    \left( \rho 
+ \mathcal{L}^*\cR \mathcal{L}+ \mathcal{L}^* \mathcal M \mathcal{L} \right)^{-1}   p_i  \nonumber \\
+&=&   \mathcal{L}^{-1} p_j  + \sum_{i=1}^n e_{ij}    \left( \rho \mathcal{L}^* \cR \mathcal{L}+ \mathcal N \right)^{-1}   p_i   \nonumber \\
+&=&   \mathcal{L}^{-1} p_j  +   \left( \rho \mathcal{L}^* \cR \mathcal{L}+ \mathcal{C}_N^*  \mathcal{C}_N \right)^{-1}   \mathcal{C}_N^* {\mathbf{e}}_j,
+\end{eqnarray}
+with $\mathcal{N}$ given in~\eqref{eq:N}.
+\end{proof}
+\begin{rem}
+Next, we consider two limiting cases. In the limit of $\rho \rightarrow \infty$,  the data-fitting term (i.e., the first term) in~\eqref{eq:eFWI} is dropped. The solution $u_j = \mathcal{L}(c)^{-1} p_j$ for $j=1,\ldots, n$ coupled with any fixed $c$ is a global minimum to the joint optimization problem~\eqref{eq:eFWI}, which then have infinitely many solutions. On the other hand, when $\rho =0$, the model-fitting term  (i.e., the second term) in~\eqref{eq:eFWI} disappears. However, the two linear operators $\mathcal{M}: U\rightarrow U$ and $\mathcal{N}: U\rightarrow V$ are not necessarily invertible since they map the (infinite-dimensional) space $U$ to a finite-dimensional subspace of $U$ or $V$, spanned by $\{\cL^{-*}p_i\}_{i=1}^n \subset U$ and $\{p_i\}_{i=1}^n \subset V$, respectively. In this case, even for a fixed $c$, we have infinitely many solutions, $u_j^*$ for a fixed $j$, given that $U$ is infinite-dimensional. The representer theorem no longer holds.
+\end{rem}
+
+Next, we present a corollary which further simplify the representation of $u_j^*$.
+\begin{cor}\label{col:simple_Representer}
+For any fixed $c$ and $\rho > 0$, the solutions $u_j^*$ to \eqref{eq:eFWI} are of the form 
+\[
+u_j^* = \mathcal{L}^{-1}p_j + \sum_i \alpha_{ij} (\mathcal{L}^*\cR \mathcal{L})^{-1}p_j.
+\]
+Correspondingly, the solutions $r_j^*$ to \eqref{eq:eFWI2} are of the form
+\[
+r_j^* = \sum_i \alpha_{ij} \cR^{-1} \mathcal{L}^{-*}p_j,
+\]
+where $\cR^{-1}: V^* = U \rightarrow V$ is the inverse Riesz map that maps an element in $V^*$ to an element in $V$. 
+\end{cor}
+\begin{proof}
+First, we introduce variables $\{w_i\}$ such that
+$$u_j^* = \mathcal{L}^{-1}p_j + \sum_i e_{ij} (\rho \mathcal{L}^* \cR \mathcal{L} + \cN)^{-1}p_i = \mathcal{L}^{-1}p_j + \sum_i e_{ij}w_i$$ where
+$$
+(\rho \mathcal{L}^*\cR \mathcal{L} + \mathcal{N})w_i = p_i.
+$$
+Recall that $\mathcal{N}w_i = \sum_l \langle p_l,w_i  \rangle p_l$. We then find 
+$$
+\mathcal{L}^* \cR \mathcal{L} w_i = \rho^{-1} p_i - \rho^{-1} 
+ \sum_l \langle p_l, w_i\rangle p_l = \sum_l \gamma_{li} \, p_l.
+$$
+The coefficients $\{\gamma_{li}\}_{l=1}^n$ depends on $w_i$. This implies that  $ w_i = \sum_{l} \gamma_{li}  (
+ \mathcal{L}^* \cR \mathcal{L})^{-1} p_l$. Plugging $w_i$ back in to the explicit form of $u_j^*$, we obtain
+$$
+u_j^* = \mathcal{L}^{-1}p_j + \sum_{i,l=1}^n e_{ij} \gamma_{li} (\mathcal{L}^*\cR \mathcal{L})^{-1}p_l = \mathcal{L}^{-1}p_j + \sum_{l=1}^n \alpha_{jl} (\mathcal{L}^*\cR \mathcal{L})^{-1}p_l.
+$$
+
+Note that the coefficients $\alpha_{jl}$ are not known a-priori; this result only indicates that $u_j^*$ can in principle be represented as a linear combination of $\{(\mathcal{L}^* \cR \mathcal{L})^{-1} p_l \}_{l=1}^n$ and hence in which subspace this solution lies. 
+
+The expression for $r_j^*$ follows immediately from the definition $r_j = \mathcal{L}u_j - p_j$.
+\end{proof}
+
+
+
+\subsection{Reformulation}
+\begin{thm}[A reduced formulation]
+\label{thm2}
+The extended FWI problem \eqref{eq:eFWI} in $(c, u)$ can be formulated equivalently in reduced form as
+\begin{equation}\label{eq:new_obj}
+\min_c \frac{1}{2} \sum_{j=1}^n\|\mathbf{e}_j(c)\|_{(I+\rho^{-1}N(c))^{-1}}^2,
+\end{equation}
+with
+${\mathbf{e}}_j(c) = [e_{1j}(c),\ldots,e_{nj}(c)]^\top$ and $N \in \mathbb{R}^{n\times n}$ defined as
+\begin{eqnarray}
+N_{ij}(c) &=&  \langle \mathcal{L}(c)^{-*} p_i,\, \cR^{-1} \mathcal{L}(c)^{-*} p_j \rangle =  \langle \mathcal{L}(c)^{-*} p_i,\, \mathcal{L}(c)^{-*} p_j \rangle_U .
+\end{eqnarray}
+\end{thm}
+\begin{proof}
+Following from the proof of Theorem~\ref{thm:Representer},
+at this particular $r_j^*$, the minimum of the inner loss 
+\begin{equation}\label{eq:J_j}
+J_j(c,r_j^*) = \frac{1}{2} \| {\mathbf{e}}_j \|_2^2 - \frac{1}{2} {\mathbf{e}}_j \cdot  M {\mathbf{e}}_j =  \frac{1}{2} {\mathbf{e}}_j \cdot \left(I+  \rho^{-1} N \right)^{-1} {\mathbf{e}}_j , 
+\end{equation}
+where ${\mathbf{e}}_j = [e_{1j},\ldots,e_{nj}]^\top$, $I$ is the $n\times n$ identity matrix, and $M,N \in \mathbb{R}^{n\times n}$ are matrices with the $ik$-th entry as
+\begin{eqnarray*}
+M_{ik} &=&   \langle p_i , \,\, \mathcal{L}^{-1} \left(\rho \mathcal{R} + \mathcal M \right)^{-1}  \mathcal{L}^{-*} p_k \rangle, \\
+N_{ik} &=&  \langle p_i , \,\, (\mathcal{L}^* \cR \mathcal{L})^{-1} p_k \rangle .
+\end{eqnarray*}
+
+The first equality in~\eqref{eq:J_j} is a direct calculation. Next, we justify the second equality in~\eqref{eq:J_j}. To begin with, we  represent the linear action induced by matrices $M$ and $N$ through the linear operators used earlier defined over various function spaces: $\forall \boldsymbol{\eta}\in \mathbb{R}^n$, 
+\begin{eqnarray*}
+M\boldsymbol{\eta} &=& \cC_M \left( \rho \mathcal{R} + \mathcal M\right)^{-1} \cC_M^* \boldsymbol{\eta},\\
+N\boldsymbol{\eta} &=& \cC_M \cR^{-1} \cC_M^* \boldsymbol{\eta}. 
+\end{eqnarray*}
+It is straightforward to check the above since we can recover every entry of the matrices $M$ and $N$: $M_{ij} = \mathbf{b}_i \cdot  M \mathbf{b}_j$ and $N_{ij} = \mathbf{b}_i \cdot  N \mathbf{b}_j$ with $\{\mathbf{b}_i \}_{i=1}^n$ being the standard basis in $\mathbb{R}^n$.
+
+The celebrated Sherman--Morrison--Woodbury formula for the inverse of matrices can also be generalized to linear operators~\cite{deng2011generalization}. We used it to deduce a simpler form for $J_j$ which justifies the last equality in~\eqref{eq:J_j}.
+\begin{eqnarray*}
+\left(I - M \right)^{-1} &=& \left( I -  \cC_M \left( \rho \mathcal{R} + \mathcal M\right)^{-1} \cC_M^*\right)^{-1}\\
+&=& I + \cC_M \left( \rho \mathcal{R} + \mathcal M - \cC_M^* \cC_M\right)^{-1} \cC_M^*\\
+&=& I + \rho^{-1} \cC_M \mathcal{R}^{-1} \cC_M^* \\
+&=& I + \rho^{-1} N.
+\end{eqnarray*}
+% It is not difficult to check that $(I - M)^{-1} = I + \rho^{-1} N$, where $I$ is the $n\times n$ identity matrix.
+\end{proof}
+
+\subsection{State-dependent metric}
+Assume the linear operator $\mathcal{L}$ is nice (\yy{needs to find out what is needed here}, the objective function in~\eqref{eq:new_obj} is equivalent to measuring the data misfit $\{{\bf e}_j\}$ in a state-dependent metric $g_c$, rather than the common Euclidean space which reduces to the least-squares-based optimization problem
+\begin{equation} \label{eq:old_obj}
+\min_c \frac{1}{2} \sum_{j=1}^n\|\mathbf{e}_j(c)\|_{2}^2 .
+\end{equation}
+
+The metric between any two $\mathbb{R}^n$ vectors, ${\bf a}_i$ and  ${\bf a}_j$, is induced  by the inner product $g_c$ given by
+\begin{equation}\label{eq:g_inner_product}
+    g_c \left( {\bf a}_i, {\bf a}_j \right)  = { \bf a}_i \cdot \left( I + \rho^{-1} N(c) \right)^{-1} {\bf a}_j.
+\end{equation}
+Since we assume that $\{p_i\}$ are linearly independent, $N(c)$ has full rank and is thus invertible. Recall that $N(c) = \cC_M(c) \cR^{-1} \cC_M^*(c)$. Its inverse takes the form
+\begin{equation*}
+    N^{-1}(c) =   \left(\cC_M^\dagger (c) \right)^* \cR \, \cC_M^\dagger(c),
+\end{equation*}
+where $\cC_M^\dagger(c): \mathbb{R}^n \rightarrow V$ denotes the Moore--Penrose inverse of the quasimatrix $\cC_M(c):V\rightarrow \mathbb{R}^n$ such that $\cC_M(c) \cC_M^\dagger(c) = I$. The inner product in~\eqref{eq:g_inner_product} is a regularized version of
+\[
+\bar{g}_c  \left( {\bf a}_i, {\bf a}_j \right)  := { \bf a}_i \cdot   N(c)^{-1} {\bf a}_j =  \langle \cC_M^\dagger(c) { \bf a}_i , \,  \cC_M^\dagger(c) { \bf a}_j   \rangle_V = \langle \cR\cC_M^\dagger(c) { \bf a}_i , \,  \cR \cC_M^\dagger(c) { \bf a}_j   \rangle_U, 
+\]
+based on which, the metric $\bar{g}_c  \left( {\bf a}, {\bf a} \right)$ returns the $\|\cdot \|_U$ norm of $\cR \cC_M^\dagger(c) { \bf a}$, the orthogonal projection of ${ \bf a} \in \mathbb{R}^d$ onto the $\text{span}\{\cL^{-1}p_1,\ldots, \cL^{-1}p_n \} \subset U$. This step can be interpreted as ``lifting'' the data misfit $\{
+{\bf e}_j\}$ from the space of discrete measurements to the continuous PDE solution space through $\{
+\cR \cC_M^\dagger(c){\bf e}_j\}$, which lie in the range of the solution operator $\cL^{-1}$, and then compute their solution norm in $U$. 
+
+The weighting matrix $\left( I + \rho^{-1} N(c) \right)^{-1} $ here is the \textit{harmonic mean} between the identity matrix $I$ and $\rho N(c)^{-1}$. Assume that $N^{-1}$ has eigenvalues values $\sigma_1\leq \sigma_2 \leq \ldots \leq \sigma_n$. Then the matrix $(I + \rho^{-1} N(c))^{-1}$ has eigenvalues in a decreasing order 
+\[
+\frac{\sigma_1}{\sigma_1 + \rho^{-1}}\leq \frac{\sigma_2}{\sigma_2 + \rho^{-1}} \leq \ldots \leq \frac{\sigma_n}{\sigma_n + \rho^{-1}}.
+\]
+As a result, $I+\rho^{-1} N(c)$ has a smaller condition number than $N(c)$ and is more stable to invert.
+
+
+% The damping in the metric can be interpreted as a variant of the Tikhonov regularization.
+
+% \begin{equation}\label{eq:g2}
+%     \bar{g}_c \left( {\bf e}_i, {\bf e}_j \right)  = { \bf e}_i \cdot  N(c)^{-1} {\bf e}_j.
+% \end{equation}
+
+% \begin{itemize}
+% \item properties and interpretation of kernel matrix $N$
+% \end{itemize}
+
+\section{Case studies}
+
+\subsection{Schr{\"o}dinger equation}
+Consider the following PDE in some domain $\Omega \subset \mathbb{R}^d$ with homogeneous Neumann boundary conditions
+$$
+\lambda u - c u + \nabla^2 u = p.
+$$
+The measurements are given by 
+$$d_{ij}(\lambda) = \langle p_i, u_j(\lambda)\rangle,$$
+where $u_j(\lambda)$ is a solution for source $p_j$. 
+\tvl{I'm not sure how to proceed; if we let $U=V=L^2$ we can derive the required result, however, we cannot guarantee that $\mathcal{L}^{-1}r$ is smooth enough if $r$ is only in $L^2$?}
+\yy{
+I think it is better that we assume the source $p\in V = H^{-1}$ while $u\in U =  H^1$. In this way, we have $R = (- \Delta)^{-1}$, recalling that $R: H^{-1} \rightarrow H^1$. Thus, using the definition of the matrix $N$, we have 
+\[
+N_{ik}(\lambda) = \int u_i(\lambda)  ( - \Delta) u_k(\lambda) = \int \nabla u_i(\lambda)  \cdot \nabla u_k(\lambda). 
+\]
+The boundary term disappears due to the zero Neumann boundary condition.
+}
+\tvl{on the other hand, we shoud have $N_{ij} = \langle L^{-1}p_i, L^{-1}p_j \rangle_{U} = \int c(x)  u_i u_j  + \int \nabla u_i \cdot \nabla u_j$, so if we use a weighted inner product depending on $c$ we can extract this from the data..}
+The corresponding $\mathcal{L}$ is self-adjoint and we have
+$$N_{ij}(\lambda) = \langle u_i(\lambda), u_j(\lambda) \rangle.$$
+We can compute these elements from the data, as per the following lemma.
+\begin{lma}
+We have 
+$$N_{ij}(\lambda) = d_{ij}'(\lambda),$$
+\end{lma}
+with $d'_{ij}$ denoting the derivative of the measurements with respect to $\lambda$.
+\begin{proof}
+The weak formulation is given by 
+$$\lambda \langle u(\lambda), \phi \rangle - \langle c u(\lambda), \phi \rangle - \langle \nabla u(\lambda), \nabla \phi \rangle = \langle p, \phi\rangle. $$
+from this
+$$\lambda \langle u_i(\lambda), u_j(\lambda) \rangle - \langle c u_i(\lambda), u_j(\lambda) \rangle - \langle \nabla u_i(\lambda), \nabla u_j(\lambda) \rangle = \langle p_i, u_j(\lambda)\rangle = d_{ij}(\lambda). $$
+and
+$$\lambda \langle u_j(\lambda), u_i(\lambda) \rangle - \langle c u_j(\lambda), u_i(\lambda) \rangle - \langle \nabla u_j(\lambda), \nabla u_i(\lambda) \rangle = \langle p_j, u_i(\lambda)\rangle = d_{ji}(\lambda). $$
+so $d_{ij}(\lambda) = d_{ji}(\lambda)$ as a result of $\langle p_i, \cL^{-1} p_j \rangle = \langle \cL^{-1} p_i,  p_j \rangle $ due to the self-adjointness of the $\cL$.
+Now consider
+$$\lambda \langle u_i(\lambda), u_j(\mu) \rangle - \langle c u_i(\lambda), u_j(\mu) \rangle - \langle \nabla u_i(\lambda), \nabla u_j(\mu) \rangle = \langle p_i, u_j(\mu)\rangle = d_{ij}(\mu). $$
+and
+$$\mu\langle u_j(\mu), u_i(\lambda) \rangle - \langle c u_j(\mu), u_i(\lambda) \rangle - \langle \nabla u_j(\mu), \nabla u_i(\lambda) \rangle = \langle p_j, u_i(\lambda)\rangle = d_{ji}(\lambda). $$
+hence
+$$d_{ij}(\mu) - d_{ji}(\lambda) = (\lambda - \mu) \langle u_i(\lambda), u_j(\mu)\rangle$$
+thus
+$$\langle u_i(\lambda), u_j(\lambda)\rangle = -d'_{ij}(\lambda).$$
+\end{proof}
+
+\subsection{Helmholtz equation I}
+Consider the Helmholtz equation in $\Omega \subseteq \mathbb{R}^s$
+\[
+\omega^2 u + c \nabla^2 u = p, \quad \text{in} \quad\Omega,
+\]
+\[
+\imath \omega u - n\cdot \nabla (c u) = 0 \quad \text{in} \quad\partial\Omega.
+\]
+This defines $\mathcal{L}u = p$. The corresponding adjoint PDE $\mathcal{L}^*v = q$ is given by 
+\[
+\omega^2 v + c \nabla^2 v = q, \quad \text{in} \quad\Omega,
+\]
+\[
+\imath \omega v  + n\cdot \nabla (c v) = 0 \quad \text{in} \quad\partial\Omega.
+\]
+
+Measurements are given by $d_{ij}(\omega) = \langle p_i, u_j(\omega)\rangle_{\Omega}$, with $\langle u, v\rangle_{\Omega} = \int_{\Omega} u v\, \mathrm{d}V$. We also introduce $\langle u, v\rangle_{\partial\Omega} = \int_{\partial \Omega} u v \,\mathrm{d}S$.
+
+For the reformulation of E-FWI, we need the matrix $N_{ij}(\omega) = \langle v_i(\omega), v_j(\omega) \rangle_{\Omega}$ with $\mathcal{L}^*v_i = p_i$.
+
+\begin{lma}
+We have
+\[
+\langle v_i(\omega), v_j(\omega) \rangle_{\Omega} = \frac{\overline{d_{ji}(\mu)} - d_{ji}(\omega)}{\omega^2 - \mu^2} - \imath \frac{\langle v_i(\omega), v_j(\mu)\rangle_{\partial\Omega}}{\omega - \mu},
+\]
+where  $\mathcal{L}^*v_i = p_i$.
+\tvl{the second term is nasty, need to think a bit more on it}
+\end{lma}
+\begin{proof}
+Following the same procedure as before, we have the following relations between solutions $v_i(\omega)$ and $v_j(\mu)$ to the adjoint equation
+\[
+\omega^2 \langle v_i(\omega), v_j(\mu)\rangle_{\Omega} -\imath\omega \langle u_i(\omega), v_j(\mu)\rangle_{\partial\Omega} - \langle \nabla (c v_i(\omega)), \nabla (cv_j(\mu))\rangle_{\Omega} = \langle p_i, v_j(\mu)\rangle_{\Omega},
+\]
+and
+\[
+\mu^2 \langle v_i(\omega), v_j(\mu)\rangle_{\Omega} + \imath\mu \langle v_i(\omega), v_j(\mu)\rangle_{\partial\Omega} - \langle \nabla (c v_i(\omega)), \nabla (cv_j(\mu))\rangle_{\Omega} = \langle p_i, \overline{v_j(\omega)}\rangle_{\Omega},
+\]
+From this we find
+\[
+\langle v_i(\omega), v_j(\mu)\rangle_{\Omega} = \frac{\langle p_i, v_j(\mu) - \overline{v_j(\omega)}\rangle_{\Omega}}{\omega^2 - \mu^2} - \imath \frac{\langle v_i(\omega), v_j(\mu)\rangle_{\partial\Omega}}{\omega - \mu}.
+\]
+Moreover, we have that $\langle p_i, v_j(\omega) \rangle = \overline{d_{ji}(\omega)}$ (\tvl{add proof}). 
+Hence,
+\[
+\langle v_i(\omega), v_j(\mu)\rangle_{\Omega} = \frac{\overline{d_{ji}(\mu)} - d_{ji}(\omega)}{\omega^2 - \mu^2} - \imath \frac{\langle v_i(\omega), v_j(\mu)\rangle_{\partial\Omega}}{\omega - \mu}.
+\]
+\end{proof}
+
+\subsection{Helmholtz equation II}
+Consider the Helmholtz equation in the unit sphere
+\[
+\omega^2 u + c \nabla^2 u = 0, \quad \text{in} \quad\Omega,
+\]
+\[
+\imath \omega u - n\cdot \nabla (c u) = p \quad \text{in} \quad\partial\Omega.
+\]
+This defines $\mathcal{L}u = p$. The corresponding adjoint PDE $\mathcal{L}^*v = q$ is given by 
+\[
+\omega^2 u + c \nabla^2 u = 0, \quad \text{in} \quad\Omega,
+\]
+\[
+\imath \omega u + n\cdot \nabla (c u) = p \quad \text{in} \quad\partial\Omega.
+\]
+Measurements are given by $d_{ij}(\omega) = \langle p_i, u_j(\omega)\rangle_{\partial\Omega}$, with $\langle u, v\rangle_{\Omega} = \int_{\Omega} u v\, \mathrm{d}V$. We also introduce $\langle u, v\rangle_{\partial\Omega} = \int_{\partial \Omega} u v \,\mathrm{d}S$.
+
+For the reformulation of E-FWI, we need the matrix $N_{ij}(\omega) = \langle v_i(\omega), v_j(\omega) \rangle_{\Omega}$ with $\mathcal{L}^*v_i = p_i$.
+Following a similar procedure as before, we have
+\[
+\langle v_i(\omega), v_j(\mu) \rangle_{\Omega} = \frac{d_{ij}(\mu) - \overline{d_{ij}(\omega)}}{\omega^2 - \mu^2} - \imath \frac{\langle u_j(\omega),u_i(\mu)\rangle_{\partial\Omega}}{\omega - \mu}.
+\]
+We can approximate the boundary integral using the available measurements. In particular, if the $\{p_i\}_i$ form an orthogonal basis for functions on $\partial\Omega$, we can approximate
+\[
+\langle u_j(\omega),u_i(\mu)\rangle_{\partial\Omega} \approx \sum_{k} d_{kj}(\omega)\overline{d_{ki}(\mu)}.
+\]
+\section{Algorithms}
+\begin{itemize}
+\item Conventional FWI
+\item Conventional E-FWI
+\item iteratively re-weighted approach
+\item Data-driven kernel
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% RESULTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DISCUSSION AND CONCLUSION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Discussion and Conclusion}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OLD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\appendix
+\section{Some Background}
+Consider the wave equation
+\begin{eqnarray}
+    \mathcal{L} (c) u &=& q, \label{eq:wave}\\
+    d &=& \mathcal{P}u,
+\end{eqnarray}
+where $u$ is the wavefield and $d = u|_{\gamma}$ is the observed data on a subset of the domain denoted by ${\gamma}$, and the wave operator $\mathcal{L} (c) = \partial_t^2 - c^2 \nabla^2$. The solution to~\eqref{eq:wave} is 
+\begin{equation}
+    u = \mathcal{G}q = \int_0^t \int_{\mathbb{R}^d} g(t-s,x,y) q(s,y) dy ds,
+\end{equation}
+where $g(t,x,y)$ is the Green's function for $\mathcal{L}(c)$. Thus, $\mathcal{L} \mathcal{G} = \mathcal{G} \mathcal{L}= \mathcal{I}$, the identity operator.
+
+
+\subsection{RKHS for State Estimation}
+Based on~\cite{leeuwen2021data}, we have an inverse problem of finding state $u$ given data $d$. It is a linear inverse problem based on this relation alone $d = \mathcal{P}u$, but it is also very badly behaved  since it is not injective. On the other hand, we can add a bit of regularization since we are not searching for any $u$ but those as solutions to the wave equation $\mathcal{L} (c) u = q$ (although we probably still do not have injectivity). 
+
+The main idea in~\cite{leeuwen2021data} is to introduce an RKHS $\mathcal{U}$ equipped with the inner product
+\begin{equation}
+    \langle u,v\rangle_{\mathcal{U}} =     \langle \mathcal{L} (c) u,\mathcal{L} (c) v\rangle_{\mathbb{R}^{n+1}},
+\end{equation}
+where $n$ is the dimension of the spatial domain for $u$. The reproducing kernel of $\mathcal{U}$ is the Green's function of $\mathcal{L}^* \mathcal{L}$
+\begin{equation}
+    k(t,x,t',x') = \int_0^T \int_{\mathbb{R}^{n}} g(t-s,x,t) g(t'-s,,y,x') dy ds,
+\end{equation}
+where $g(t,x,y)$ is the Green's function for $\mathcal{L}(c)$.
+
+The problem of estimating state variable $u$ can be formulated as a regularized minimization problem \textbf{in the RKHS space $\mathcal{U}$}. Given finite number of data observations $d_i = u^*(t_i,x_i)$, $1\leq i\leq M$, we have
+\begin{equation}
+    \min_{u\in \mathcal{U}} \sum_{i=1}^M \left( u(t_i,x_i) - d_i \right)^2 + \rho \|\mathcal{L} u -q\|^2_{L^2}.
+\end{equation}
+After a chance of variable $u = \mathcal{G}q+w$ and $r_i = d_i - \mathcal{G}q|_{(t_i,x_i)}$, $1\leq i \leq M$, we have
+\begin{equation}\label{eq:RKHS_min}
+    \min_{w \in \mathcal{U}} \sum_{i=1}^M \left( w(t_i,x_i)) - r_i \right)^2 + \rho \|w\|^2_{\mathcal{U}}.
+\end{equation}
+Here, we define $\|w\|^2_{\mathcal{U}} = \langle w,w \rangle_{\mathcal{U}}$. Under the Representer Theorem, we know the explicit solution to~\eqref{eq:RKHS_min} is finite-dimensional and of the form
+\begin{equation}
+    w(t,x) = \sum_{j=1}^M w_i k(t_j,x_j,t,x),
+\end{equation}
+with the coefficients ${\bf w} = [w_1,\ldots, w_M]^\top$ given by
+\begin{equation}
+    {\bf w}  = \left( K + \rho I\right)^{-1} {\bf r}.
+\end{equation}
+Here, $K$ is an $M$-by-$M$ symmetric matrix with $K_{ij} = k(t_i,x_i,t_j,x_j)$. \yy{Needs to double check. Different from the paper~\cite{leeuwen2021data}}.
+
+\section{Interpreting the ROM in~\cite{borcea2022waveform} as an RKHS-Based Method}
+\yy{Try to interpret the ROM in a similar way}
+
+\section{Incomplete Doodles at Banff}
+I first summarize all our incomplete doodles at Banff here. In~\cite{van2015penalty}, we can perform joint state and paramter estimation by
+\begin{equation}
+    \min_{u,c} \| \mathcal{P} u - d \|^2+ \rho \|\mathcal{L} u -q\|^2_{L^2}.
+\end{equation}
+After the same change of variables as earlier, and assuming $u\in\mathcal{U}$, we have 
+\begin{equation}
+    \min_{c} \min_{w\in \mathcal{U}} \sum_{i=1}^M \left( w(t_i,x_i)) - r_i \right)^2 + \rho \|w\|^2_{\mathcal{U}} =  \min_{c}  \left( K(c) + \rho I\right)^{-1} {\bf r},
+\end{equation}
+where $ K(c) = \mathcal{P}^* (\mathcal{L}(c)^* \mathcal{L}(c))^{-1} \mathcal{P}$. Is it equivalent to finding $c$ as the following?
+\begin{equation}
+    \min_c \|\mathcal{P} \mathcal{L}(c)^{-1} q - d\|^2_{I + \rho^{-1} K(c)}.
+\end{equation}
+Also, this line of thought could be related to the idea in the note~\cite{van2019note}.
+
+
+The general idea in~\cite{borcea2022waveform} is to find $c$ such that
+\begin{equation}
+    \min_c \|\overline K(c) - \overline K(\bar{c}) \|^2,
+\end{equation}
+where $\overline K(\bar{c})$ is an ROM kernel learned from data, and $\overline K(c)$ is an ROM kernel modeling.
+
+\section{Motivation and Ideas}
+I guess the main idea is to extract useful insights from all of the above and propose a method that mitigate cycle skipping as a main contribution for a future work.
+
+Any concrete things to do?
+
+\section{Worked example}
+Consider the following state equation
+\[
+-\nabla^2 u_i(x) + c(x)u_i(x) + \lambda u_i(x) = p_i(x), \quad x \in \Omega
+\]
+with Neumann b.c.'s $\partial_n u_i = 0$ on $\partial \Omega$. We take measurements 
+$$
+d_{ij}(\lambda) = \langle p_i, \overline{u}_j \rangle
+$$ 
+of the true states $\overline{u}_j$ corresponding to some true coefficient $\overline{c}$. Let $p_i(x) = \delta(x - x_i)$ represent point sources. 
+\subsection{ROM-based approach}
+The original approach accounts for multiple sources and multiple frequencies, however, we only focus on multiple sources here and fix the frequency $\lambda$.
+
+The weak formulation of the problem reads
+\[
+\langle\nabla u_i, \nabla \phi\rangle + \langle c\cdot u_i, \phi\rangle + \lambda \langle u_i, \phi\rangle = \langle p_i, \phi\rangle.
+\]
+Then use solutions themselves as test functions , i.e., $\phi = \{u_j\}$, and express solution in terms of same basis
+\[
+u_i = \sum_{j}\alpha_{ij}u_j,
+\]
+this seems a bit silly, but bear with me.  The ROM is then
+\[
+(S + \lambda M)\boldsymbol{\alpha}_i = \mathbf{d}_{i},
+\]
+with
+\[
+S_{ij} = \langle\nabla u_i, \nabla u_j\rangle + \langle c\cdot u_i, u_j\rangle,
+\]
+\[
+M_{ij} = \langle u_i, u_j\rangle.
+\]
+It is not hard to see (\yy{Actually, I would prefer more details here}) that we can compute these matrices from the data:
+\[
+M_{ij} = d_{ij}'(\lambda),
+\]
+\[
+S_{ij} = d_{ij}(\lambda) - d_{ij}'(\lambda).
+\]
+\yy{What is $d_{ij}'(\lambda)$?}
+This means we can compute the coefficients $\alpha_{ij}$ corresponding to the true states $\overline{u}_i$ from the data. To approximate the true states from the data we proceed as follows. First we apply Lanczos to get $T,Q$ for which
+\[
+Q^TSQ = T, \quad Q^TMQ = I.
+\]
+\yy{Is $T$ triangular?} We can then approximate the true states as
+\[
+\widetilde{u}_i = \sum_j \beta_{ij}\overline{v}_j, \, (\boldsymbol{\beta_i} = Q^\top \boldsymbol{\alpha_i})
+\]
+with $\boldsymbol{\beta}_i$ solving
+\[
+(T + \lambda I)\boldsymbol{\beta}_i = Q^T\mathbf{d}_i,
+\]
+and 
+\[
+\overline{v}_i = \sum_{j} q_{ij}\overline{u}_i \, (V = U Q , \,U = V Q^\top ),\quad Q_{ij} = q_{ij}.
+\]
+Note that $\langle \overline{v}_i, \overline{v}_j\rangle = \delta_{ij}$.
+This is circular, since we cannot possible compute the $\overline{v}_i$'s (they require the true states $\{\overline{u}_i\}$), we replace them by an orthogonalised basis computed for a reference coefficient $c^{(0)}$:
+\[
+v_i^{(0)} = \sum_{j} q_{ij}^{(0)}u_i^{(0)},\quad \{ Q^{(0)}\}_{ij} = \\q_{ij}^{(0)},
+\]
+where $u_i^{(0)}$ solves the PDE for $c^{(0)}$ and $Q^{(0)}$ is the output of the corresponding Lanczos orthogalisation. A questions is what the approximation error is... (\yy{I think that's the catch or the theorem of no free lunch. The approximation error should be small if the chosen $c^{(0)}$ is close to the  true $c$ in certain space. It depends on the radius of convergence of this problem.}
+
+
+
+In any case, we have a clear algorithm for approximating the true states from the data, given a reference coefficient $c^{(0)}$:
+\begin{enumerate}
+\item Compute ROM matrices $M,S$ from the data $d_{ij}$
+\item Compute solutions $u_i^{(0)}$ and ROM matrices $M^{(0)},S^{(0)}$ for reference coefficient $c^{(0)}$
+\item Lanczos to get $T, Q$ and $T^{(0)}, Q^{(0)}$
+\item Form basis $v_i^{(0)} = \sum_{j} q^{(0)}_{ij}u_j^{(0)}$
+\item solve system of equations $(T + \lambda I)\boldsymbol{\beta}_i = Q^T\mathbf{d}_i,$
+\item approximate as $\widetilde{u}_i = \sum_j \beta_{ij}v_j^{(0)}$
+\end{enumerate}
+We can now get the coefficient $c$ from the approximated states via a Lipmann-Schwinger equation
+\[
+\int_{\Omega} u_i(x) \widetilde{u}_j(x) (c(x) - c^{(0)}(x))\mathrm{d}x = d_{ij}^{(0)} - d_{ij}.
+\]
+Note that this relation is exact if we have the true states ($\widetilde{u}_i = \overline{u}_i$). Replacing the approximations with the reference states ($\widetilde{u}_i = u_i^{(0)}$) yields the Born approximation. \yy{That's very interesting!}
+
+\subsection{PDE-constrained approach}
+We can then write the inverse problem as a PDE-constrained optimization problem
+\[
+\min_{c,V} \textstyle{\frac{1}{2}} \sum_{ij} \|v_i(x_j) - d_{ij}\|^2 + \frac{\rho}{2}\|\mathcal{L}(c)v_i - p_i\|^2.
+\]
+Introduce $\mathcal{L}(c)w_i = \mathcal{L}(c)v_i - p_i$ and express as 
+\[
+\min_{c,W} \textstyle{\frac{1}{2}} \sum_{ij} \|w_i(x_j) + u_i(x_j) - d_{ij}\|^2 + \frac{\rho}{2}\|\mathcal{L}(c)w_i\|^2,
+\]
+where $\mathcal{L}(c)u_i = p_i = \delta(x-x_i)$. We introduce an RKHS $\mathcal{U}$ equipped with the inner product
+\begin{equation}
+    \langle u_i,u_j\rangle_{\mathcal{U}} =     \langle \mathcal{L} (c) u_i,\mathcal{L} (c) u_j\rangle_{\mathbb{R}^{n}},
+\end{equation}
+where $n$ is the dimension for the PDE solution. Now use the representer theorem and express the solution $w_i(x) = \sum_{j} \alpha_{ij} k(x,x_j)$ with $\mathcal{L}(c)^*\mathcal{L}(c)k(\cdot,x_i) = p_i  = \delta(x-x_i)$ (representer of evaluation and reproducing property). Then
+\[
+w_i(x_j) =  \sum_{j} \alpha_{ij} k_{ij},
+\]
+\[
+\mathcal{L}(c)^*\mathcal{L}(c)w_i(x) = \sum_{j} \alpha_{ij}p_j(x) 
+\]
+\[
+\|\mathcal{L}(c)w_i\|^2 = \langle \sum_{j} \alpha_{ij}p_j
+(x), \sum_{j'} \alpha_{ij'}k(x,x_{j'})\rangle = \sum_{j,j'} \alpha_{ij}\alpha_{ij'}k_{j'j},
+\]
+\yy{I updated the last equation. Can you check again?}
+with $k_{ij} = k(x_i,x_j)$. Note that $k_{ij} = \langle u_i, u_j\rangle$. To see this note that $\mathcal{L}$ is self-adjoint and so 
+$$\mathcal{L}k(\cdot,x_i) =\mathcal{L}^{-1} p_i =  u_i$$ 
+from which $\langle \mathcal{L}k(\cdot,x_i),u_j\rangle = \langle u_i, u_j\rangle$ which leads to $\langle k(\cdot,x_i), \mathcal{L}u_j \rangle = \langle u_i, u_j\rangle$.  Using $\mathcal{L}u_j = p_j$, we have
+\[
+\langle k(\cdot,x_i), p_j\rangle = \langle k(\cdot,x_i), \mathcal{L}(c)^*\mathcal{L}(c) k(\cdot,x_j)\rangle = \langle k(\cdot,x_i),  k(\cdot,x_j)\rangle_{\mathcal{U}} =  k(x_i, x_j).
+\]
+This gives the desired result.
+
+Introducing $\boldsymbol{\alpha}_i = (\alpha_{i,1}, \alpha_{i,2},\ldots)$ and $A = (\boldsymbol{\alpha}_1, \boldsymbol{\alpha}_2, \ldots)$, $\mathbf{r}_i = (d_{i,1} - u_i(x_1), d_{i,2} - u_i(x_2), \ldots )$ this becomes
+\[
+ \min_{c,A} \frac{1}{2}\sum_i \|K(c)\boldsymbol{\alpha}_i - \mathbf{r}_i(c)\|_2^2 + \frac{\rho}{2} \|\boldsymbol{\alpha}_i\|_{K(c)}^2.
+\]
+We have a closed-form solution for $\boldsymbol{\alpha}_i$:
+% K\alpha  + \rho \alpha = r
+\[
+\boldsymbol{\alpha}_i(c) = \left(K(c) + \rho I\right)^{-1}\mathbf{r}_i(c).
+\]
+Plugging back in, we have a problem solely in $c$
+\[
+ \min_{c} \frac{1}{2}\sum_i \|K(c)\left(K(c) + \rho I\right)^{-1}\mathbf{r}_i(c) - \mathbf{r}_i(c)\|_2^2 + \frac{\rho}{2} \|\left(K(c) + \rho I\right)^{-1}\mathbf{r}_i(c)\|_{K(c)}^2.
+\]
+With some algebra, this yields
+\begin{equation} \label{eq:main}
+\min_c \sum_i \textstyle{\frac{1}{2}}\|\mathbf{r}_i(c)\|_{(I + \rho^{-1}K(c))^{-1}}^2.
+\end{equation}
+\yy{This seems to me as a model-driven RKHS for inverse problems.}
+Note that in conventional FWI we would solve
+\[
+\min_c \sum \textstyle{\frac{1}{2}}\|\mathbf{r}_i(c)\|_2^2,\quad \text{s.t.~} \mathcal{L}(c) u_i = p_i
+\]
+\subsection{A representer theorem}
+Solve $$\min_{c,u} \sum_{i,j=1}^{n}\left((\langle p_i, u_j\rangle - d_{ij})^2 + \rho \|L(c)u_i - p_i\|^2\right).$$
+
+\begin{itemize}
+\item formalise to include boundary conditions properly
+\item perhaps boundary conditions are not needed if we include a null-space term... we end up with 'splines'
+\end{itemize}
+The inner problem over $u_i \in \mathcal{U}$ admits a solution of the form $$u_i(x) = g_i(x) + \sum_{j=1}
+^n w_{ij} k_j(x),$$
+with $Lg_i(x) = p_i(x)$ and $L^*L k_i(x) = p_i(x)$.
+Substitute the known form of the solution in the optimization problem, with
+$$\langle p_i, u_j\rangle = \langle p_i, g_j\rangle + \sum_{l} w_{jl}\langle p_i,k_l \rangle,$$
+$$Lu_i = p_i + \sum_{j} w_{ij} L k_j.$$
+We end up with $$\min_{W} \sum_i \|K\mathbf{w}_i + \mathbf{r}_i\|_2^2 + \rho \mathbf{w}_i^TK\mathbf{w}_i,$$
+with $\mathbf{r}_i = (\langle p_1, g_i\rangle - d_{1i}, \ldots, \langle p_n, g_i - d_{ni}\rangle)$ and $K_{ij}  = \langle p_i, k_j\rangle$. Moreover, we find $K_{ij} = \langle Lk_i, Lk_j\rangle=\langle v_i,v_j\rangle$ with $L^* v_i = p_i$.  The problem has a closed-form solution for $\mathbf{w}_i$.
+Note that $\mathbf{r}_i$ and $K$ depend on $c$ and the problem can be expressed as
+$$\min_c \sum_i\|\mathbf{r}_i(c)\|_{(I+\rho^{-1}K(c))^{-1}}^2.$$
+
+% \subsection{Connecting the two methods}
+% The idea is now to replace the variable metric by the one \emph{for the true $c$} and solve
+% \[
+% \min_c \sum \textstyle{\frac{1}{2}}\|\mathbf{r}_i(c)\|_{(I + \rho^{-1}K(\overline{c}))^{-1}}^2.
+% \]
+% Remember that $k_{ij}(\overline{c}) = \langle\overline{u}_i, \overline{u}_j \rangle$, so we can compute this from the data
+% \[
+% K(\overline{c})_{ij} = d_{ij}'(\lambda).
+% \]
+% We can find perhaps more direct connections; we can compute the coefficients $\boldsymbol{\alpha}_i$ from the data and then attempt to estimate the internal solution from that
+% \[
+% \widetilde{u}_i(x) = \sum_j \alpha_{ij}k^{(0)}(x,x_j),
+% \]
+% with $k^{(0)}$ is the kernel computed for the background coefficient $c^{(0)}$. We can then attempt to estimate $c$ from that.
+
+
+\section{Helmholtz Equation Inversion}
+We consider the following symmetrized Helmholtz equation
+\begin{equation} \label{eq:helm}
+    \begin{cases}
+    \omega^2 u + c(x) \Delta (c(x) u) = p(x,\omega) & x\in \Omega,\\
+  \nabla \left( c(x)  u(x)  \right) - i\omega u = 0 & x \in \partial \Omega.
+    \end{cases}
+\end{equation}
+Assuming $p\in H^{-1}(\Omega)$, $c(x) \in L^\infty(\Omega)$ and $c(x) \equiv 1$ on $\partial \Omega$ and any test function $\phi \in H^1 (\Omega)$, we have the following weak form of~\eqref{eq:helm}. 
+\begin{eqnarray}
+  \langle \nabla  \left( c u \right), \nabla  \left( c \phi  \right) \rangle_{L^2(\Omega)} - \omega^2 \langle u,\phi\rangle_{L^2(\Omega)}    - i\omega \langle u,\phi \rangle_{L^2(\partial \Omega)} = - \langle p, \phi \rangle_{L^2(\Omega)}
+\label{eq:weak form helm}   
+\end{eqnarray}
+We then define $u_i(\omega)$ as the solution of this for source $p_i$ and the measurements as $d_{ij}(\omega) = \langle p_i, u_j\rangle$.
+
+\begin{itemize}
+\item Properties of $K$ (smoothing??)
+\item Get kernel from data
+\item compare conventional; variable kernel, fixed kernel for reference medium, fixed kernel for true medium
+\end{itemize}
+From the previous section we find that $K_{ij} = \langle v_i, v_j\rangle$ with $L^*v_i = p_i$. For the Helmholtz equation we find that $v_i = \overline{u}_i$ with $Lu_i = p_i$. Using the weak form with $p\equiv p_i$ and $\phi\equiv u_j$ we find that 
+$$K_{ij} = {\textstyle{\frac{1}{2}}}\overline{d_{ij}''(\omega)}.$$  
+
+\bibliography{ref}
+\bibliographystyle{plain}
+\end{document}

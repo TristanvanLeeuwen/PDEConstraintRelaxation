@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+
+\usepackage[papersize={8.5in,11in},margin=1in]{geometry}
+\usepackage[final,stretch=10,shrink=10]{microtype} % default of stretch=shrink=20 is a little too much
+\usepackage{amsmath,amsfonts,amsxtra,amssymb}
+\usepackage{url}
+\usepackage{bm}
+\usepackage[sort&compress]{natbib}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage[normalem]{ulem}
+\usepackage{xcolor}
+\usepackage[shadow,prependcaption,textsize=small]{todonotes}
+
+\usepackage{comment}
+
+\definecolor{bluey}{rgb}{0.0,0.2,0.5}
+\newcommand{\mycomment}[1]{\textit{\color{bluey}#1}}
+\newcommand{\blue}[1]{\textcolor{blue}{#1}}
+\newcommand{\green}[1]{\textcolor{green}{#1}}
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+\newcommand{\magenta}[1]{\textcolor{magenta}{#1}}
+\newcommand{\argmin}{\operatorname{arg}\min}
+\newcommand{\R}{\mathbb{R}}
+
+\newcommand{\fa}{\mathfrak{a}}
+\newcommand{\fb}{\mathfrak{b}}
+\newcommand{\fab}{\fa\fb}
+\newcommand{\fba}{\fb\fa}
+\newcommand{\muab}{\mu_{\fa\fb}}
+\newcommand{\nuab}{\nu_{\fa\fb}}
+\newcommand{\ha}{H^{\fa}}
+\newcommand{\hb}{H^{\fb}}
+
+%\definecolor{rev1}{HTML}{cb270f}
+%\definecolor{rev2}{HTML}{1c8235}
+
+
+\begin{document}
+
+\addtocounter{page}{-1}
+\thispagestyle{empty}
+
+\hfill
+\begin{flushright}
+Correspondence to: \\
+Tristan van Leeuwen\\
+\texttt{t.van.leeuwen@cwi.nl}\\
+\end{flushright}
+
+\vspace{1em}
+\hfill\today
+\ \\
+\ \\
+\ \\
+\noindent Dear Editor,\ \\
+
+\noindent  Thank you for forwarding the reviews of our article
+titled \emph{An Analysis of Constraint-Relaxation in PDE-Based Inverse Problems} which was submitted to \textit{Inverse Problems}. \ \\
+
+\noindent  We are appreciative of the reviews made by the referees and  the further suggestions.\ \\
+
+\noindent Attached to this letter is a response to the third referee. Corresponding changes have been colored in blue in the new revision. \ \\
+
+\noindent We would like to resubmit for consideration the enclosed revision, and we look forward to hearing from the Editor. \ \\
+
+\noindent  Sincerely, \ \\
+
+\noindent  Tristan van Leeuwen and Yunan Yang
+
+
+
+\clearpage
+
+
+\centerline{\textbf{{\large Response to the Third Referee}}}
+\ \\
+We thank the third referee for the comprehensive review and many suggestions that significantly improved the manuscript. Please see below for our response to the comments. 
+
+\begin{itemize}
+    \item[R3.1] \mycomment{The first sentence of the abstract should be removed. Perhaps it should be combined with the second " Many inverse problems are naturally formulated as a PDE-constrained optimization problem."  Also, perhaps instead of saying we provide an in-depth analysis , say "we analyze a relaxed formulation...}
+
+We thank the referee for the suggestion. We have updated the abstract based on the comments.
+
+
+\item[R3.2] \mycomment{I am not sure the introduction needs separate subsections. (the last subsection is just one paragraph)}
+
+We have removed the title of the subsections in the Introduction.
+
+
+\item[R3.3] \mycomment{Is there a better section title for section 2?}
+
+We renamed it to "Main results".
+
+\end{itemize}
+
+
+\end{document}

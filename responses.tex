@@ -1,0 +1,267 @@
+\documentclass[11pt]{article}
+
+\usepackage[papersize={8.5in,11in},margin=1in]{geometry}
+\usepackage[final,stretch=10,shrink=10]{microtype} % default of stretch=shrink=20 is a little too much
+\usepackage{amsmath,amsfonts,amsxtra,amssymb}
+\usepackage{url}
+\usepackage{bm}
+\usepackage[sort&compress]{natbib}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage[normalem]{ulem}
+\usepackage{xcolor}
+\usepackage[shadow,prependcaption,textsize=small]{todonotes}
+
+\usepackage{comment}
+
+\definecolor{bluey}{rgb}{0.0,0.2,0.5}
+\newcommand{\mycomment}[1]{\textit{\color{bluey}#1}}
+\newcommand{\blue}[1]{\textcolor{blue}{#1}}
+\newcommand{\green}[1]{\textcolor{green}{#1}}
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+\newcommand{\magenta}[1]{\textcolor{magenta}{#1}}
+\newcommand{\argmin}{\operatorname{arg}\min}
+\newcommand{\R}{\mathbb{R}}
+
+\newcommand{\fa}{\mathfrak{a}}
+\newcommand{\fb}{\mathfrak{b}}
+\newcommand{\fab}{\fa\fb}
+\newcommand{\fba}{\fb\fa}
+\newcommand{\muab}{\mu_{\fa\fb}}
+\newcommand{\nuab}{\nu_{\fa\fb}}
+\newcommand{\ha}{H^{\fa}}
+\newcommand{\hb}{H^{\fb}}
+
+%\definecolor{rev1}{HTML}{cb270f}
+%\definecolor{rev2}{HTML}{1c8235}
+
+
+\begin{document}
+
+\addtocounter{page}{-1}
+\thispagestyle{empty}
+
+\hfill
+\begin{flushright}
+Correspondence to: \\
+Tristan van Leeuwen\\
+\texttt{t.van.leeuwen@cwi.nl}\\
+\end{flushright}
+
+\vspace{1em}
+\hfill\today
+\ \\
+\ \\
+\ \\
+\noindent Dear Editor,\ \\
+
+\noindent  Thank you for forwarding the reviews of our article
+titled \emph{data-driven approach to PDE-constrained optimization in inverse problems} which was submitted to \textit{Inverse Problems}. \ \\
+
+\noindent  We are appreciative of the comprehensive reviews made by the referees. The suggestions and careful attention have prompted several changes and improvements to the article. We changed the title to reflect better to focus of the paper on analysis of the constraint-relaxation technique and have re-written the abstract and introduction accordingly. We have also clarified the assumptions and limitations of the analysis and added details regarding the numerical experiments.\ \\
+
+\noindent Attached to this letter is a response to the comments and a discussion of the revision from the referees. As we have re-written substantial parts of the paper, we did not mark the individual changes but rather indicate what changes where made in the replies. \ \\
+
+\noindent We would like to resubmit for consideration the enclosed revision, and we look forward to hearing from the Editor. \ \\
+
+\noindent  Sincerely, \ \\
+
+\noindent  Tristan van Leeuwen and Yunan Yang
+
+
+
+\clearpage
+
+\centerline{\textbf{{\large Response to the First Referee}}}
+\ \\
+We thank the first referee for the comprehensive review and many suggestions that significantly improved the manuscript. Please see below for our response to the comments. 
+%In the revision, we have highlighted the corresponding changes in \blue{blue}.
+
+\begin{enumerate}[parsep=1em,leftmargin=1em]
+\item[R1.1] \mycomment{The introduction is quite verbose for the information contained in it. What does a sentence like: ”Leveraging
+PDEs within an optimization framework for solving inverse problems offers a promising avenue for striking a balance between the available data and the underlying physical principles.” add?
+I think it is is unneccesarily verbose with little content and I would recommend to rewrite this unless you prefer this style.}
+
+We thank the referee for the suggestion. We have rewritten the introduction, the abstract and the title to make our contributions and the goal of this work more clear.
+
+\item[R1.2] \mycomment{page 2, line 43: In what sense is the PDE-residual affine to c in for instance inverse scattering with for instance
+the wave equation? In the perturbative sense? Could you please elaborate on this? Corollary 2 states convexity
+under some assumptions which does not show the residual is affine. Or do you mean that the residual represents
+a source term and the PDE is linear in it.}
+
+We mean this in the sense that $\mathcal{L}(c)u-\mathcal{P}$ is affine when viewed as a mapping from $\mathsf{C}\rightarrow\mathsf{V}$ defined by $c\rightarrow \mathcal{L}(c)u-\mathcal{P}$ . This holds for a large class of linear PDEs of the form $\mathcal{L}(c) = \sum_{|\alpha|\leq n} c_{\alpha}\partial^\alpha$. We have clarified in the text when necessary.
+
+\item[R1.3] \mycomment{Theorem 2 assumes that the Riesz representers are orthonormal and follow from $\mathcal{P}$ and $\mathsf{U}$. How limiting is this
+assumption in practice? Or does one guarantee this by using transducers with no spatial overlap?} 
+
+The assumption of orthonormal basis in Theorem 2  is to provide a neat interpretation of $J_\infty$ as the \textit{orthogonal} projection of the solution residual. However, if $\{p_i\}_{i=1}^n$ are only linearly independent (not necessarily orthonormal), we can still view  $J_\infty$ a ``weighted'' projection of the solution residual by the mass matrix $M$.
+
+We want to highlight that Theorems 2 and 3 are to provide neat interpretations of the limiting cases $J_0$ and $J_\infty$ based on the solution residual and PDE residual. These two theorems are independent of the main convexity result in Corollary 2, which does not assume orthonormal basis.
+
+The assumption of linear independence can be dropped for practical implementation for non-zero $\rho$ as well.
+
+
+
+\item[R1.4] \mycomment{The Grammian and data residual matrix is square. Does this mean the observation functionals and forcing
+functionals are the same, i.e. you assume complete array data?}
+
+
+In general, the PDE-constrained optimization with a ``soft constraint'', in the form of our Equation~(1), does not require the number of forcing terms and the number of observations match; see the newly added Remark 1 on Page 5. In all cases the Grammian matrix will be square with size \#of receivers $\times$ \#of receivers. 
+
+However, if we would like to extract the data Grammian matrix from data we need sources and receivers to coincide (e.g., by using transducers). The idea of obtaining the data Grammian matrix was inspired by a sequence of reduced-order modeling work by authors in~\cite{Borcea2018,Borcea2020,borcea2022waveform}. 
+
+
+
+
+
+
+
+\item[R1.5] \mycomment{Equation 11 is indeed the data error squared. I have a harder time interpreting Equation 12 were we also have
+a missmatch term squared. There is a term
+\[
+\mathcal{P}_i\left([u_1,\ldots, u_n]\right)^* G^{-1} \mathcal{P}_i\left([u_1,\ldots, u_n]\right)
+\]
+and the Grammian essentially orthogonalizes the state vectors? So is this some form of an observation of data mismatch of orthogonalized states? I guess in Theorem 2 you offer your interpretation of this functional in terms of projections}
+
+
+We are not orthogonalizing the data residual in Equation (12). Instead, $J_0(c)$ in Equation (12) can be seen as (weighted) projection of  the PDE residual onto the finite-dimensional linear space spanned by the $\{w_j\}_{j=1}^n$ (see Theorem 3). Under assumptions, $J_0(c)$ can be regarded as orthogonalizing the PDE residual. 
+
+Analogously, Equation (11) is the (weighted) projection of  the PDE residual onto the finite-dimensional linear space spanned by the $\{p_j\}_{j=1}^n$. (see Theorem 2). Under assumptions, $J_\infty(c)$ in Equation (11) can be seen as orthogonalizing the solution residual. 
+
+ 
+\item[R1.6] \mycomment{How limiting is the assumption for Corollary 2. How does one guarantee this? Or do you see this as a constraint
+on the source functions as their representations need to span the entire solution space to guarantee recovery of
+c.}
+
+As commented in Remark 6, Corollary 2 has its limitations by assuming that $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$ while $\{p_i\}$ are both the receivers and the forcing terms. This means our function space $\mathsf{U}$ in this Galerkin framework may not approximate the solution well. Nevertheless, this is a case where we can neatly prove the convexity of the objective function with respect to any variable coefficient $c$ belonging to any arbitrary function class. If this choice of $\mathsf{U}$ does not yield a good approximation of the solution, the minimizer of this quadratic functional may be far from the true coefficient however.
+
+
+% \item[R1.7] \mycomment{Two numerical examples are provided. The first is the recovery of a constant wavespeed in the 1D Helmholz
+% equation with one reflecting boundary from complete array data of n delta functions at a single frequency. This
+% problem requires a single measurement to solve by hand, however, it does technically suffer from cycle skipping
+% at high frequencies.}
+
+
+
+\item[R1.7] \mycomment{First set of numerical experiments
+\begin{itemize}
+\item [(a)] The figures 4,5,6 are not readable when printed.
+\item [(b)] The results in Figure 4 are not very convincing, at low frequencies k the objective function is convex
+(depending on how close to the reflecting boundary of the source location is. )
+\item [(c)]At high frequencies the basin of attraction is only slightly widened for n = 2, so do the assumptions needed
+to proof convexity not hold in this simple case?
+\end{itemize}
+}
+
+\begin{itemize}
+    \item[a] We have made the plots bigger.
+    \item[b,c] It is well-known that the inverse problem is easy to solve when using low-frequency data, hence the observed behavior for low $k$ in figures 4, 5, 6. When moving to higher frequencies, the problem for $n=2$ remains difficult, indicating also a clear limitation to the relaxation technique. This does not contradict the observation in corollary 2 as we are not using the suggested basis for spanning the solution space here. When moving to $n=10$ we can interpret the results in light of Corollary 2 as the basis functions corresponding to these sources/receivers would yield an accurate representation of the solution of the PDE.
+\end{itemize}
+
+\item[R1.8] \mycomment{
+Second set of numerical experiments:
+\begin{itemize}
+    \item [(a)] In the 2D example you assume that the function you are trying to recover has an exact representation in
+your basis functions. Further, the function you are trying to recover is very smooth. What happends if this is not the case, how do you regularize?
+\item [(b)] How do you handle noise? In the case of noise data, there is no guarantee that the data-driven Grammina
+is positive definite
+\item [(c)] The entire problem setup is strange and kind of cooked up. In this inverse problem, the forcing functions
+are selected by prescribing solutions pi to the homogeneous equation. This means the forcing functions
+are not localized but extend far into the domain. Normally in an inverse problem we have localized
+forcing functions that are in a domain of known medium parameters and we are trying invert changes
+inside a domain. Here the variations of c are mainly concentrated around the forcing functions. Also the
+assumption that U = [p1, . . . , pn] does not hold here
+\end{itemize}
+}
+
+Please see below for our responses.
+\begin{itemize}
+    \item[(a)] As the starting point of any method derived from the Galerkin principle, one always assumes that the PDE solution is a linear combination of the given basis functions. The convergence between the numerical solution and the true solution happens when the number of basis functions goes to infinity based on the approximation theory of the choices of basis. 
+    If the parameter $c$ or the PDE solution $u$ is not smooth, we can use a different set of basis functions, such as piece-wise constant, to parameterize them. 
+
+    \item[(b)] We do not have a guarantee that the Grammian matrix is always positive definite if the data contain noises. One approach to handle this scenario is to project the data-generated matrix (noisy) to the manifold of all symmetric positive definite matrices. This step can be regarded as a denoising process.
+    \item[(c)] We want to point out that: (1) in all 2D examples, the forcing term is a Gaussian localized at a point on the boundary, and (2)  the variations the parameter $c$ in Sections 3.2 and 3.4 are not concentrated around the forcing functions (which are Gaussian centered on the boundary). 
+
+ We need to see where the referee got the impression that those were the case. We added more details and rewritten some texts in the numerical section to highlight these two items.
+
+\end{itemize}
+
+\item[R1.9] \mycomment{In the bibliography titles contain words that are typically capitalized: pde-constrained, schr\"odinger equation...}
+
+
+We thank the referee for spotting these. We have corrected the entries.
+
+\end{enumerate}
+
+\newpage
+
+\centerline{\textbf{{\large Response to the Second Referee}}}
+\ \\
+We thank the second referee for the comprehensive review and many suggestions that significantly improved the manuscript. Please see below for our response to the comments. 
+%In the revision, we have highlighted the corresponding changes in \red{red}.
+
+
+\begin{itemize}
+    \item[R2.1] \mycomment{I do not understand the paper's point to study solution residual and PDE residual. What we should care about is whether or not the minimizer approximates the true solution to the IP under consideration.}
+
+You are right, we are ultimately interested in comparing the minimiser of the original functional $J_\infty$ with that of $J_\rho$ for finite $\rho$. Such results are available in earlier work (\cite[Thm 4.3]{van2015penalty}) in the limit for large $\rho$. Here, we provide an interpretation of the relaxation in terms of the stated projections of the various residuals. In particular, for $\rho=0$ this tells us that we effectively minimize a PDE-residual (which has the minizer at the correct place). This is not proof that the minimisers of $J_0$ and $J_\infty$ coincide as the projection also depends on $c$, but the numerical results strongly suggest that in simple test cases they do. Further research will be aimed at showing that the basis on which we project (see Thm 3) depends only weakly on $c$ (an observarion also made in the data-driven ROM work \cite{Borcea2018,Borcea2020,borcea2022waveform}).
+
+
+    \item[R2.2] \mycomment{Solving IP with data measured inside $\Omega$, as in the paper, is not interesting. Engineers cannot place the source generators and the detectors inside the body under inspection. Also, when you assume the knowledge of internal data, your inverse problems in the numerical sections are linear. The unknown $c$ is of the form ``$c$ power 1". I strongly believe that traditional Tikhonov methods are applicable. Requesting data for ``data-driven" is too expensive. When you need both data-driven and the model of PDEs, I think studying inverse problems with external measurement is a lot more interesting, realistic, and applicable.}
+
+We do not assume in our analysis the availability of internal data and we have clarified this further in the text. The inverse problems we study in section 3 are (even in the idealistic 1D Helmholtz problem which does use internal data) not linear, as is shown by the plots of the objective functions $J_\infty$ in figures 4, 5, 6. The behavior of $J_\infty$ is decidedly not quadratic, underscoring the challenge of solving the problem using the traditional least-squares approach.
+
+
+    \item[R2.3] \mycomment{The numerical section is not professional. The authors did not specify the distribution of $x_i$, noise level, or the number of discretizations.}
+
+We added further details to clarify this.
+
+
+    \item[R2.4] \mycomment{I do not understand Figure 4 and Figure 5. How do people sketch the curve with the horizontal axis as the function $c$? Note that a function does not belong to a one-dimensional space.}
+
+It is mentioned in 3.3.3 that we consider constant soundspeed for the numerical example. We added a clarification in the revision.
+
+
+
+
+ 
+    \item[R2.5] \mycomment{The paper uses the ``soft constraint" method. I would appreciate it if the authors could write a brief paragraph about it and explain why it can be used to overcome the ``local minimizer challenge" of optimization methods.}
+
+    There have been many prior works (see our introduction) that adapt the ``soft constraint'' framework with reported observations on the improved optimization landscape. We have re-written the introduction to better clarify this. One main contribution of this work is to provide an analysis to explain these observations and, under certain assumptions, to justify the observed bigger basin of attraction. The main result corresponding to explaining the better convexity is Corollary 2.
+    
+\end{itemize}
+
+\newpage
+
+\centerline{\textbf{{\large Response to the Third Referee}}}
+\ \\
+We thank the third referee for the comprehensive review and many suggestions that significantly improved the manuscript. Please see below for our response to the comments. 
+
+\begin{itemize}
+    \item[R3.1] \mycomment{The paper should be rewritten in general, especially the abstract and introduction. These should state more clearly what will be in the paper for a scientific audience.}
+
+
+We have rewritten the title, abstract and introduction to make the objective of this paper more clear.
+
+
+    \item[R3.2] \mycomment{The numerical section should be rewritten more clearly.}
+
+We have rewritten the numerical section with bigger and more clear plots.
+
+
+    \item[R3.3] \mycomment{ It does not seem to me that internal data is necessary, so the authors should describe the placement of the sources/detectors, and any assumptions if there are any.}
+
+    As commented by the referee, we do not assume internal data measurements in general. We only have one example (1D Helmholtz) in this setup, simply to show the optimization landscape. The theoretical results only assume linear independence and in some cases orthogonality of the Riesz representations of the sources/receivers mainly for technical reasons. For practical implementation, both assumptions can be relaxed. We added some remarks to this effect. We have also added more details about our experimental setups and highlight the locations of the sources/receivers.
+
+    \item[R3.4] \mycomment{The numerical experiments should contain a more realistic 2-d numerical example.}
+
+We have added a new  2D numerical exam based on the seismic inversion application in Section 3.5.
+
+\end{itemize}
+\clearpage
+\bibliography{ref}
+\bibliographystyle{plain}
+
+\end{document}
