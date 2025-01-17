@@ -486,7 +486,7 @@ f_i(x) = \exp{(-20|x-x_i|^2)},\quad x\in \mathbb{R}^2\,,
 where $x_i$ is the center of the Gaussian. We use $n = 40$ sources and their location are depicted in Figure~\ref{fig:centers}.
 \begin{figure}
 \centering
-\includegraphics[width = 0.5\textwidth]{Figures/schrodinger_basis_loc.png}
+\includegraphics[width = 0.5\textwidth]{figures/schrodinger_basis_loc.png}
     \caption{The location of the Gaussian centers for the direct method on the domain $[0,1]^2$.}\label{fig:centers}
 \end{figure}
 The corresponding PDE solution with the source $f_i$ is denoted by $u_i$. We first note that $w_i = u_i$ in~\eqref{eq:adjoint_weak} with $\mathcal{P}$ replaced by $\mathcal{P}_i$ since the PDE is self-adjoint. As a result, the Gram matrix is given by
@@ -513,8 +513,8 @@ Note that this example satisfies the assumptions in~\Cref{thm:quadratic}, so the
 
 \begin{figure}[ht!]
     \centering
-    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-source-basis-H1semi-inner.pdf}}
-        \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-source-basis-C-H1semi-inner.pdf}}
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{figures/Poisson2D-source-basis-H1semi-inner.pdf}}
+        \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{figures/Poisson2D-source-basis-C-H1semi-inner.pdf}}
     \caption{The optimization landscape for PDE-constrained optimization based on the 2D inverse conductivity problem, for which the forward problem is the Poisson equation with a variable coefficient~\eqref{eq:2d_poisson}. The Hilbert space $\mathsf{U} = \text{span}\{p_i\}_{i=1}^n$. In (B), the inner product is given by $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega \nabla u \cdot \nabla v  \,  \mathrm{d}x$ while the inner product in (B) is given by  $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u \cdot \nabla v  \,  \mathrm{d}x$.}\label{fig:Poisson2D_source_basis}
 \end{figure}
 
@@ -524,8 +524,8 @@ In both figures, we observe the gradual variance from the case $\rho = 0$ to the
 
 \begin{figure}[ht!]
     \centering
-    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-full-basis-H1semi-inner.pdf}}
-    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{Figures/Poisson2D-full-basis-C-H1semi-inner.pdf}}
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ without $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{figures/Poisson2D-full-basis-H1semi-inner.pdf}}
+    \subfloat[$\langle \cdot, \cdot \rangle_\mathsf{U}$ with $c(x)$-dependency]{\includegraphics[width = 0.5\textwidth]{figures/Poisson2D-full-basis-C-H1semi-inner.pdf}}
     \caption{PDE-constrained optimization based on the 2D inverse conductivity problem, for which the forward problem is the Poisson equation with variable coefficient~\eqref{eq:2d_poisson}. The Hilbert space $\mathsf{U}$ is spanned by 2D first-order Lagrange elements over the domain $[0,1]^2$.  In (A), the inner product is given by  $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega \nabla u \cdot \nabla v  \,  \mathrm{d}x$. In (B), the inner product is given by $\langle u, v\rangle_{\mathsf{U}} = \int_\Omega c(x) \nabla u \cdot \nabla v  \,  \mathrm{d}x$. }\label{fig:Poisson2D_full_basis}
 \end{figure}
 
@@ -623,23 +623,23 @@ J_\rho(c) &= {\textstyle\frac{1}{2}}\text{trace}\left(E(c)^*\left(I + \rho^{-1}G
 \end{align}
 In this notation, the wavenumber $k$ is implicit and fixed. The fundamental difference between~\eqref{variable metric} and~\eqref{data-driven metric} is that the former uses a parameter-dependent Grammian, which we denote by $G(c)$ in a slight abuse of notation, while the latter uses the data-driven Grammian defined in~\eqref{eq:data_gram_helm}, which here we denote by $\widetilde{G}$. 
 
-In this experiment, we take measurements at $x_i = i / (n+1)$ for $i = 1, \ldots, n$ and generate (noiseless) data for $c = 1$. The behavior of the three objectives for various values of $(n, k, \rho)$ is shown in Figures \ref{fig:helmholtz1da}-\ref{fig:helmholtz1dc}.
+In this experiment, we take measurements at $x_i = i / (n+1)$ for $i = 1, \ldots, n$ and generate (noiseless) data for $c = 1$. The behavior of the three objectives for various values of $(n, k, \rho)$ is shown in figures \ref{fig:helmholtz1da}-\ref{fig:helmholtz1dc}.
 
 
 We highlight a few interesting observations. First, the optimization problem generally gets more challenging (with more local minima) for larger $k$ (higher frequencies). This is expected and well-known behavior for inverse problems with the Helmholtz equation. Second, the relaxed approach for small $\rho$ makes the problem easier to solve (i.e., with fewer local minima, which is advantageous for gradient-based optimization algorithms) when more measurements are available (following Theorem \ref{thm:quadratic}). Third, the data-driven metric formulated in~\eqref{data-driven metric} is a good alternative to the variable metric approach given in~\eqref{variable metric} in these examples. Note that we do not need to differentiate the Grammian using the data-driven metric, but only the data misfit $E(c)$, which can be computed using the adjoint-state method. Therefore, using any gradient-based optimization algorithms, such as steepest descent and nonlinear conjugate gradient methods, the objective function \eqref{data-driven metric} incurs the same computational cost compared to the objective function~\eqref{conventional}. %However, the former is shown to have much better optimization landscapes.
 Finally, we note that for $n=10$ we observe the convex behavior suggested by section \ref{sec:convex} as only in the limit of large $n$ does the finite-dimensional space yield a sufficiently accurate representation of the solution of the PDE.
 \begin{figure}
-\includegraphics[scale=.5]{Figures/Helmholtz1D_2.png}
+\includegraphics[scale=.5]{figures/Helmholtz1D_2.png}
 \caption{Helmholtz example: different objective functions for $n=2$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1da}
 \end{figure}
 
 \begin{figure}
-\includegraphics[scale=.5]{Figures/Helmholtz1D_5.png}
+\includegraphics[scale=.5]{figures/Helmholtz1D_5.png}
 \caption{Helmholtz example: different objective functions for $n=5$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1db}
 \end{figure}
 
 \begin{figure}
-\includegraphics[scale=.5]{Figures/Helmholtz1D_10.png}
+\includegraphics[scale=.5]{figures/Helmholtz1D_10.png}
 \caption{Helmholtz example: different objective functions for $n=10$; conventional (dashed), variable metric (blue), data-drive metric (orange).}\label{fig:helmholtz1dc}
 \end{figure}
 % \clearpage
@@ -687,10 +687,10 @@ To illustrate the effectiveness of the direct method in Remark~\ref{rem:direct},
 
 \begin{figure}
     \centering
-    \subfloat[The true coefficient]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_true.png}}
-    \subfloat[Inversion with  $a = 1$]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a1_inv.png}}\\
-    \subfloat[Inversion with  $a=3$]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a3_inv.png}}
-    \subfloat[Inversion with $a = 10$]{\includegraphics[width = 0.49\textwidth]{Figures/schrodinger_a10_inv.png}}
+    \subfloat[The true coefficient]{\includegraphics[width = 0.49\textwidth]{figures/schrodinger_true.png}}
+    \subfloat[Inversion with  $a = 1$]{\includegraphics[width = 0.49\textwidth]{figures/schrodinger_a1_inv.png}}\\
+    \subfloat[Inversion with  $a=3$]{\includegraphics[width = 0.49\textwidth]{figures/schrodinger_a3_inv.png}}
+    \subfloat[Inversion with $a = 10$]{\includegraphics[width = 0.49\textwidth]{figures/schrodinger_a10_inv.png}}
     \caption{A direct method~\eqref{eq:direct} to reconstruct the variable coefficient for the linear Schr\"odingr equation. (A): the true coefficient $c(x)$; (B)-(D): the direct reconstruction using the Gaussian sources of different parameters,  ranging from $a=1$ (B), $a=3$ (C) to $a=10$ (D).}
     \label{fig:direct_method}
 \end{figure}
@@ -733,9 +733,9 @@ To test the robustness of the inversion process to initialization, we consider t
 \begin{figure}
 \centering
 \begin{tabular}{ccc}
-\includegraphics[width=0.33\linewidth]{Figures/marm-true.png}&
-\includegraphics[width=0.33\linewidth]{Figures/smooth-init.png}&
-\includegraphics[width=0.33\linewidth]{Figures/line-init.png}\\
+\includegraphics[width=0.33\linewidth]{figures/marm-true.png}&
+\includegraphics[width=0.33\linewidth]{figures/smooth-init.png}&
+\includegraphics[width=0.33\linewidth]{figures/line-init.png}\\
 (a)&(b)&(c)\\
 \end{tabular}
 \caption{Left: ground-truth velocity; middle: initial velocity for Case 1; right: initial velocity for Case 2.}
@@ -748,14 +748,14 @@ We run the following experiments:
 \item \textbf{Experiment 2.} Here, we set the frequency to be $6$hz, the initial velocity as depicted in Figure~\ref{fig:marm-vels}(c). The top row of Figure~\ref{fig:line-vels} shows the reconstructed velocities. The bottom row compares the actual observed and simulated data at receivers from one selected source. 
 \end{itemize}
 
-From the numerical results in Figures~\ref{fig:smooth-vels} and~\ref{fig:line-vels}, we see that inversions using the objective function with a variable metric~\eqref{variable metric} and the one with a data-driven metric~\eqref{data-driven metric} achieve better data fitting. At the same time, the conventional method~\eqref{conventional} shows an evident local minimum trapping. Moreover, the reconstructed velocities under~\eqref{variable metric} and~\eqref{data-driven metric} have a better recovery in the deeper part of the velocity (when $z$ is large) with more low-wavenumber components recovered. Even though the weightings in the objective functions apply to the data side, they also consequently scale the velocity components during inversion. Although our theory part in Section~\ref{sec:theory} is based on simple setups with assumptions, this set of tests sheds light on the potential of variable-dependent metric and data-driven metric as an objective function in mitigating local minima in PDE-constrained optimizations.
+From the numerical results in figures~\ref{fig:smooth-vels} and~\ref{fig:line-vels}, we see that inversions using the objective function with a variable metric~\eqref{variable metric} and the one with a data-driven metric~\eqref{data-driven metric} achieve better data fitting. At the same time, the conventional method~\eqref{conventional} shows an evident local minimum trapping. Moreover, the reconstructed velocities under~\eqref{variable metric} and~\eqref{data-driven metric} have a better recovery in the deeper part of the velocity (when $z$ is large) with more low-wavenumber components recovered. Even though the weightings in the objective functions apply to the data side, they also consequently scale the velocity components during inversion. Although our theory part in Section~\ref{sec:theory} is based on simple setups with assumptions, this set of tests sheds light on the potential of variable-dependent metric and data-driven metric as an objective function in mitigating local minima in PDE-constrained optimizations.
 
 \begin{figure}
 \centering
-\includegraphics[width=0.33\linewidth]{Figures/smooth-FWI-vel.png}
-\includegraphics[width=0.33\linewidth]{Figures/smooth1-vel.png}\includegraphics[width=0.33\linewidth]{Figures/smooth-data1-vel.png}\\
-\includegraphics[width=0.33\linewidth]{Figures/smooth-FWI-wave.png}
-\includegraphics[width=0.33\linewidth]{Figures/smooth1-wave.png}\includegraphics[width=0.33\linewidth]{Figures/smooth-data1-wave.png}
+\includegraphics[width=0.33\linewidth]{figures/smooth-FWI-vel.png}
+\includegraphics[width=0.33\linewidth]{figures/smooth1-vel.png}\includegraphics[width=0.33\linewidth]{figures/smooth-data1-vel.png}\\
+\includegraphics[width=0.33\linewidth]{figures/smooth-FWI-wave.png}
+\includegraphics[width=0.33\linewidth]{figures/smooth1-wave.png}\includegraphics[width=0.33\linewidth]{figures/smooth-data1-wave.png}
 \caption{The top row shows the reconstructed velocities. The bottom row compares simulated and true data from one source. From left to right shows the result using the objective function~\eqref{conventional}, \eqref{variable metric}, and~\eqref{data-driven metric}, respectively. This sets of result correspond to Case 1, i.e., the initial velocity is the middle panel of Figure~\ref{fig:marm-vels}.}
 \label{fig:smooth-vels}
 \end{figure}
@@ -763,10 +763,10 @@ From the numerical results in Figures~\ref{fig:smooth-vels} and~\ref{fig:line-ve
 
 \begin{figure}
 \centering
-\includegraphics[width=0.33\linewidth]{Figures/line-FWI-vel.png}
-\includegraphics[width=0.33\linewidth]{Figures/line1-vel.png}\includegraphics[width=0.33\linewidth]{Figures/line-data1-vel.png}\\
-\includegraphics[width=0.33\linewidth]{Figures/line-FWI-wave.png}
-\includegraphics[width=0.33\linewidth]{Figures/line1-wave.png}\includegraphics[width=0.33\linewidth]{Figures/line-data1-wave.png}
+\includegraphics[width=0.33\linewidth]{figures/line-FWI-vel.png}
+\includegraphics[width=0.33\linewidth]{figures/line1-vel.png}\includegraphics[width=0.33\linewidth]{figures/line-data1-vel.png}\\
+\includegraphics[width=0.33\linewidth]{figures/line-FWI-wave.png}
+\includegraphics[width=0.33\linewidth]{figures/line1-wave.png}\includegraphics[width=0.33\linewidth]{figures/line-data1-wave.png}
 \caption{The top row shows the reconstructed velocities. The bottom row compares simulated and true data from one source. From left to right shows the result using the objective function~\eqref{conventional}, \eqref{variable metric}, and~\eqref{data-driven metric}, respectively. This sets of result correspond to Case 2, i.e., the initial velocity is the right panel of Figure~\ref{fig:marm-vels}.}
 \label{fig:line-vels}
 \end{figure}
