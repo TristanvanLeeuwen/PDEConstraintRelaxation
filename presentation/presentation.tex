@@ -1,0 +1,190 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usepackage{amsmath, amssymb, graphicx}
+\title[Constraint-Relaxation in PDE Inverse Problems]{An Analysis of Constraint-Relaxation in PDE-Based Inverse Problems}
+\author{Tristan van Leeuwen \\ Utrecht University and CWI}
+\date{International Workshop on Operator Learning and its Applications}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+\begin{enumerate}
+  \item Motivation and Examples
+  \item Classical Approach
+  \item Relaxed Formulation
+  \item Main Result 1: Reduced Formulation
+  \item Main Result 2: Limiting Cases
+  \item Case Study: 1D Helmholtz
+  \item Case Study: 3D Helmholtz
+  \item Wrap-up
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Motivation}
+Inverse problems aim to estimate parameters in PDEs from observations.
+\begin{itemize}
+  \item Ubiquitous in science and engineering
+  \item Typically formulated as PDE-constrained optimization
+  \item Challenge: non-linearity, ill-posedness
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Examples}
+Common applications:
+\begin{itemize}
+  \item Seismic imaging
+  \item Medical imaging (e.g., MRI, EIT)
+  \item Data assimilation in geosciences
+\end{itemize}
+%\includegraphics[width=0.8\textwidth]{example-placeholder}
+\end{frame}
+
+\begin{frame}{Classical Formulation}
+Constrained optimization problem:
+\begin{equation*}
+\min_c \frac{1}{2} \sum_{i,j} |P_i(u_j) - d_{ij}|^2 \quad \text{s.t. } A_c(u_j, \varphi) = P_j(\varphi)
+\end{equation*}
+\begin{itemize}
+  \item "Hard" PDE constraint
+  \item Highly non-linear
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Motivation for Relaxation}
+\begin{itemize}
+  \item Improve optimization landscape
+  \item Mitigate sensitivity to initialization
+  \item Enlarge search space to parameter + state
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Relaxed Formulation}
+Joint optimization problem:
+\begin{equation*}
+\min_{c, q} \frac{1}{2} \sum_{i,j} |P_i(u_j) - d_{ij}|^2 + \frac{\rho}{2} \sum_j \|q_j\|_U^2
+\end{equation*}
+Subject to:
+\begin{equation*}
+A_c(u_j, \varphi) = (P_j + R^{-1}q_j)(\varphi)
+\end{equation*}
+\end{frame}
+
+\begin{frame}{Computational Challenges}
+\begin{itemize}
+  \item Optimization over large space $C \times U^n$
+  \item Infeasible in practice
+  \item Need reduced formulation
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Representer Theorem}
+\textbf{Theorem 1:} Minimizers $q_j$ lie in span of $\{w_k\}$:
+\begin{equation*}
+q_j = \sum_{k=1}^n \alpha_{jk} w_k
+\end{equation*}
+with $A_c(\varphi, w_k) = P_k(\varphi)$
+\end{frame}
+
+\begin{frame}{Reduced Formulation}
+\textbf{Corollary 1:}
+\begin{equation*}
+J(c) = \frac{1}{2} \sum_{j=1}^n \|e_j(c)\|_{(I + \rho^{-1} G(c))^{-1}}^2
+\end{equation*}
+This is an unconstrained optimization over $c$ only.
+\end{frame}
+
+\begin{frame}{Metric Definition}
+\begin{itemize}
+  \item $G(c)$ is Gram matrix from adjoint states:
+\begin{equation*}
+G_{ij}(c) = \langle w_i, w_j \rangle_U
+\end{equation*}
+  \item Can sometimes be computed from data
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Limiting Case $\rho \to \infty$}
+\begin{equation*}
+J(c) \to \frac{1}{2} \sum_{i,j} |P_i(u_j) - d_{ij}|^2
+\end{equation*}
+\begin{itemize}
+  \item Recovers classical formulation
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Limiting Case $\rho \to 0$}
+\begin{equation*}
+J(c) \to \frac{\rho}{2} \sum_j \|e_j\|_{G(c)^{-1}}^2
+\end{equation*}
+\begin{itemize}
+  \item Residuals weighted by inverse Gram matrix
+  \item Convex under certain conditions
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Limiting Case Illustration}
+%\includegraphics[width=0.9\textwidth]{figure1-placeholder}
+\begin{itemize}
+  \item Shows projections onto $\mathcal{P}_n$ and $\mathcal{W}_n$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Projected Residuals}
+\textbf{Theorem 2 and 3:} Interpret objective as projections
+\begin{itemize}
+  \item Solution residuals onto $\mathcal{P}_n$
+  \item PDE residuals onto $\mathcal{W}_n$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Case Study: 1D Helmholtz}
+\begin{itemize}
+  \item PDE: $-u'' - (k/c)^2 u = f$
+  \item Measure: $d_{ij} = u_j(x_i)$
+  \item Analytic solution available
+\end{itemize}
+\end{frame}
+
+\begin{frame}{1D Helmholtz Results}
+%\includegraphics[width=0.9\textwidth]{figure5-placeholder}
+%\includegraphics[width=0.9\textwidth]{figure6-placeholder}
+\end{frame}
+
+\begin{frame}{Case Study: 3D Helmholtz}
+\begin{itemize}
+  \item Seismic inversion setup
+  \item 124 sources/receivers
+  \item Realistic starting models
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Reconstruction Results}
+% \includegraphics[width=0.9\textwidth]{figure10-placeholder}
+% \includegraphics[width=0.9\textwidth]{figure11-placeholder}
+\end{frame}
+
+\begin{frame}{Discussion}
+\begin{itemize}
+  \item Relaxation improves optimization landscape
+  \item Bridges data-driven and PDE-based approaches
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+  \item Presented unified framework for constraint-relaxation
+  \item Shown reduced and limiting forms
+  \item Case studies demonstrate advantages
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Acknowledgements}
+\small
+Thanks to collaborators, funding agencies, and the workshop organizers.
+\end{frame}
+
+\end{document}
