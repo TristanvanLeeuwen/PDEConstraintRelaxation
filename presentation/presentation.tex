@@ -98,7 +98,7 @@ with
   \item $e_{ij}(c) = d_{ij}-\mP_i(u_j)$ where $\mA_c(u_j,\varphi)\,\, \forall \varphi\in\sU$,
   \item $G(c)$ is Gram matrix from adjoint states:
 \begin{equation*}
-G_{ij}(c) = \langle w_i, w_j \rangle_U
+G_{ij}(c) = \langle w_i, w_j \rangle_\sU
 \end{equation*}
 \end{itemize}
 \end{frame}
@@ -146,30 +146,59 @@ while for $\rho\rightarrow 0$ we consider
 \end{frame}
 
 \begin{frame}{Data-driven approach}
-blabla
+The Grammian plays a central role and in some cases we can compute if from the measurements.
+
+For a self-adjoint PDE for example, we get
+$$g_{ij} = \langle u_i, u_j \rangle_\sU, \quad \mA_c(u_i,u_j) = d_{ij},$$
+and so we can try to identity a term $\langle u_i, u_j\rangle_\sU$ in $\mathcal{A}_c$, for example by choosing $\sU$ such that $d_{ij} = g_{ij}$.
 \end{frame}
 
-\begin{frame}{Case Study: 1D Helmholtz ($n=2$)}
+\begin{frame}{Data-driven approach}
+Having access to the Grammian for the true coefficient allows us to compute $J$ more efficiently, and potentially solve for $c$ directly:
 \begin{itemize}
-  \item PDE: $-u_j'' - (k/c)^2 u_j = f_j, \quad u_j(0;k) = 0, u_j'(1;k)=\imath (k/c)u_j(1;k)$,
-  \item Measure: $d_{ij} = \langle f_i, u_j\rangle_\sU$,
-  \item Grammian can be obtained from measurements, allowing for a data-driven approach
+  \item reconstruct $G(\check{c})$ from the data
+  \item estimate the states $\{\check{u}_i\}_{i=1}^n$ by data-driven ROM-approach to yield $\{\widetilde{u}_i\}_{i=1}^n$ 
+  \item solve for $c$ from $\mA_c(\widetilde{u}_i,\varphi)=\mP_i(\varphi)$ for $\varphi\in \sU^m$.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Case Study: 1D Helmholtz}
 
+\begin{frame}{Case Study: 1D Helmholtz}
+\begin{itemize}
+  \item PDE: $u_j'' + (k/c)^2 u_j = -f_j, \quad u_j(0;k) = 0, u_j'(1;k)=\imath (k/c)u_j(1;k)$,
+  \item Measure: $d_{ij} = \langle f_i, u_j\rangle_\sU$,
+  \item Grammian can be obtained from measurements, allowing for a data-driven approach: $$ g_{ij}(k) = \Re\left(d_{ij}(k) + {\textstyle\frac{k}{2}}d_{ij}'(k)\right) + {\textstyle\frac{\imath k^2}{2c(1)}}\left(\overline{b_i'(k)}b_j(k) - \overline{b_i(k)}b_j'(k)\right),
+$$
+where $d_{ij}'$ and $b_i'$ denote the derivatives of $d_{ij}$ and $b_i$ with respect to $k$. 
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Case Study: 1D Helmholtz ($n=2$)}
   \begin{center}
 (conventional, \textcolor{blue}{variable metric}, \textcolor{orange}{data-driven metric})
-  \end{center}
 \includegraphics[width=0.9\textwidth]{../paper/figures/Helmholtz1D_2.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Case Study: 1D Helmholtz ($n=5$)}
+  \begin{center}
+(conventional, \textcolor{blue}{variable metric}, \textcolor{orange}{data-driven metric})
+\includegraphics[width=0.9\textwidth]{../paper/figures/Helmholtz1D_5.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Case Study: 1D Helmholtz ($n=10$)}
+  \begin{center}
+(conventional, \textcolor{blue}{variable metric}, \textcolor{orange}{data-driven metric})
+\includegraphics[width=0.9\textwidth]{../paper/figures/Helmholtz1D_10.png}
+  \end{center}
 \end{frame}
 
 \begin{frame}{Case Study: 2D Helmholtz}
 \begin{itemize}
-  \item Seismic inversion setup
-  \item 124 sources/receivers
-  \item Realistic starting models
+  \item PDE: $\nabla^2 u_j + (k/c)^2u_j = f_j$ with absorbing boundary conditions,
+  \item Measurements: $d_{ij} = \langle f_i, u_j\rangle_\sU$ with $f_i$ supported on the top boundary only,
+  \item Grammian can be obtained from measurements only when measurements on all boundaries
 \end{itemize}
 \end{frame}
 
@@ -178,24 +207,13 @@ blabla
 % \includegraphics[width=0.9\textwidth]{figure11-placeholder}
 \end{frame}
 
-\begin{frame}{Discussion}
+\begin{frame}{Summary}
 \begin{itemize}
   \item Relaxation improves optimization landscape
   \item Bridges data-driven and PDE-based approaches
+  \item Presented unified framework for constraint-relaxation in PDE-based inverse problems
+  \item Numerical examples show promise, but computational efficiency needs to be improved
 \end{itemize}
-\end{frame}
-
-\begin{frame}{Conclusion}
-\begin{itemize}
-  \item Presented unified framework for constraint-relaxation
-  \item Shown reduced and limiting forms
-  \item Case studies demonstrate advantages
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Acknowledgements}
-\small
-Thanks to collaborators, funding agencies, and the workshop organizers.
 \end{frame}
 
 \end{document}
