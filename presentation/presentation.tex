@@ -1,6 +1,11 @@
 \documentclass{beamer}
 \usetheme{Madrid}
 \usepackage{amsmath, amssymb, graphicx}
+\usepackage{lmodern}
+\usepackage{biblatex}
+\addbibresource{ref.bib}
+
+
 \title[Constraint-Relaxation in PDE Inverse Problems]{An Analysis of Constraint-Relaxation in PDE-Based Inverse Problems}
 \author{Tristan van Leeuwen and Yunan Yang}
 \date{International Workshop on Operator Learning and its Applications}
@@ -20,23 +25,15 @@
 \end{frame}
 
 \begin{frame}{Motivation}
-Inverse problems aim to estimate parameters in PDEs from observations.
-\begin{itemize}
-  \item Ubiquitous in science and engineering
-  \item Typically formulated as PDE-constrained optimization
-  \item Challenge: non-linearity, ill-posedness
-\end{itemize}
+We aim to estimate parameters in a PDE from observations.
+\\[1cm]
+\centering
+\includegraphics[width=0.8\textwidth]{./figs/medical.png}
+
+\cite{guasch2020full}
+
 \end{frame}
 
-\begin{frame}{Examples}
-Common applications:
-\begin{itemize}
-  \item Seismic imaging
-  \item Medical imaging (e.g., MRI, EIT)
-  \item Data assimilation in geosciences
-\end{itemize}
-%\includegraphics[width=0.8\textwidth]{example-placeholder}
-\end{frame}
 
 \begin{frame}{Outline}
 \begin{enumerate}
@@ -61,7 +58,7 @@ with
 \end{frame}
 
 \begin{frame}{Relaxed Formulation}
-We now relax the hard constraint by introducing auxiliary source terms $q_j$:
+Relax the constraint by introducing auxiliary source terms $q_j$ \cite{van2015penalty}:
 \begin{equation}
   \label{eq:relaxed}
 \min_{c\in\sC, q\in\sU^n} \frac{1}{2} \sum_{i,j} |\mP_i(u_j) - d_{ij}|^2 + \frac{\rho}{2} \sum_j \|q_j\|_U^2
@@ -73,6 +70,15 @@ Subject to:
 \end{frame}
 
 \begin{frame}{Rationale and challenges}
+\centering
+\begin{tabular}{cc}
+  \includegraphics[scale=.35]{./figs/exampe2a-eps-converted-to.pdf} &
+  \includegraphics[scale=.2]{./figs/example3a-eps-converted-to.pdf} \\
+    & \textcolor{red}{conventional} \\
+  & \textcolor{blue}{relaxed}
+\end{tabular}
+
+\vspace{1cm}
 \begin{itemize}
   \item (+) The relaxation improves the optimization landscape and reduces sensitivity to initialization
   \item (-) Optimization over large space $\sC \times \sU^n$ (in stead of just $\sC$) makes it computationally much more demanding
@@ -80,7 +86,7 @@ Subject to:
 \end{frame}
 
 \begin{frame}{Representer Theorem}
-\textbf{Lemma 1:} Minimizers $q_j$ of \eqref{eq:relaxed} are of the form
+\textbf{Lemma 1 \cite{van2025analysis}:} Minimizers $q_j$ of \eqref{eq:relaxed} are of the form
 \begin{equation*}
 q_j = \sum_{k=1}^n \overline{\alpha_{jk}} w_k
 \end{equation*}
@@ -88,7 +94,7 @@ with $\overline{\mA_c(\varphi, w_k)} = \mP_k(\varphi),\, \forall \varphi\in\sU$ 
 \end{frame}
 
 \begin{frame}{Reduced Formulation}
-\textbf{Lemma 2:}
+\textbf{Lemma 2 \cite{van2025analysis}:}
 The objective in \eqref{eq:relaxed} can be expressed in terms of $c$ alone as 
 \begin{equation*}
 J(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j(c)\|_{(I + \rho^{-1} G(c))^{-1}}^2,
@@ -110,12 +116,12 @@ J_\infty(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j(c)\|^2,
 \end{equation*}
 and for $\rho\rightarrow 0$ we get
 \begin{equation*}
-J_0(c) = \frac{\rho}{2} \sum_{j=1}^n \|\mathbf{e}_j\|_{G(c)^{-1}}^2
+J_0(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j\|_{G(c)^{-1}}^2
 \end{equation*}
 \end{frame}
 
 \begin{frame}{Projected Residuals}
-\textbf{Theorem 1: }
+\textbf{Theorem 1 \cite{van2025analysis}: }
 When the Riesz representers $\{p_i\}_{i=1}^n$ of the sources/receivers are orthonormal and the measurements are noiseless, the functional $J_\infty$ can be equivalently expressed in terms of an orthogonal projection of the solution-residual $u_i(c) - \check{u}_i \in \mathsf{U}$ on $\mathsf{P}_n = \text{span}\{p_i\}_{i=1}^n$ as
 \[
 J_{\infty}(c) = {\textstyle\frac{1}{2}}\sum_{j=1}^n\|\Pi_{\mathsf{P}_n}(u_j(c) - \check{u}_j)\|_{\mathsf{U}}^2,
@@ -125,7 +131,7 @@ where $\Pi_{\mathsf{P}_n}:\sU\rightarrow\mathbb{C}^n$ is the orthogonal projecti
 \end{frame}
 
 \begin{frame}{Projected Residuals}
-\textbf{Theorem 2: }
+\textbf{Theorem 2 \cite{van2025analysis}: }
 For noiseless measurements, the functional $J_0(c)$ can be equivalently expressed in terms of an orthogonal projection of the PDE-residual $\mathcal{E}_j(c) = \mathcal{A}_c(\check{u}_j,\cdot) -  \mathcal{A}_{\check{c}}(\check{u}_j,\cdot) \in \mathsf{V}$, $j=1,\ldots,n$, on $\mathsf{W}_n = \text{span}\{w_j\}_{j=1}^n$ as
 \[
 J_0(c) = {\textstyle\frac{1}{2}}\sum_{j=1}^n \|\Pi_{\mathsf{W}_n}\mathcal{R}\mathcal{E}_j(c)\|_{\mathsf{U}}^2,
@@ -147,14 +153,18 @@ while for $\rho\rightarrow 0$ we consider
 
 \begin{frame}{Data-driven approach}
 The Grammian plays a central role and in some cases we can compute if from the measurements.
-
+\\[1cm]
 For a self-adjoint PDE for example, we get
 $$g_{ij} = \langle u_i, u_j \rangle_\sU, \quad \mA_c(u_i,u_j) = d_{ij},$$
-and so we can try to identity a term $\langle u_i, u_j\rangle_\sU$ in $\mathcal{A}_c$, for example by choosing $\sU$ such that $d_{ij} = g_{ij}$.
+and so we can try to identity a term $\langle u_i, u_j\rangle_\sU$ in $\mathcal{A}_c$, e.g.:
+\begin{itemize}
+  \item $\mA_c(u,v) = \int c \nabla u\cdot \nabla v \mathrm{d}x \Rightarrow g_{ij}=d_{ij}$
+  \item $\mA_c(u,v) = k^2 \int c^{-2} u v \mathrm{d}x - \int \nabla u\cdot \nabla v \mathrm{d}x \Rightarrow g_{ij}(k) = d_{ij}'(k) / (2k)$
+\end{itemize}
 \end{frame}
 
 \begin{frame}{Data-driven approach}
-Having access to the Grammian for the true coefficient allows us to compute $J$ more efficiently, and potentially solve for $c$ directly:
+Having access to the Grammian for the true coefficient allows us to compute $J$ more efficiently, and potentially solve for $c$ directly \cite{borcea2022waveform}:
 \begin{itemize}
   \item reconstruct $G(\check{c})$ from the data
   \item estimate the states $\{\check{u}_i\}_{i=1}^n$ by data-driven ROM-approach to yield $\{\widetilde{u}_i\}_{i=1}^n$ 
@@ -198,7 +208,7 @@ where $d_{ij}'$ and $b_i'$ denote the derivatives of $d_{ij}$ and $b_i$ with res
 \begin{itemize}
   \item PDE: $\nabla^2 u_j + (k/c)^2u_j = f_j$ with absorbing boundary conditions,
   \item Measurements: $d_{ij} = \langle f_i, u_j\rangle_\sU$ with $f_i$ supported on the top boundary only,
-  \item Grammian can be obtained from measurements only when measurements on all boundaries
+  \item Grammian can be obtained from measurements only when measurements on all boundaries \cite{tataris2025inverse}
 \end{itemize}
 \end{frame}
 
@@ -226,11 +236,16 @@ $\rho\rightarrow \infty$ (top) and $\rho\rightarrow 0$ (bottom)
 
 \begin{frame}{Summary}
 \begin{itemize}
-  \item Relaxation improves optimization landscape
-  \item Bridges data-driven and PDE-based approaches
-  \item Presented unified framework for constraint-relaxation in PDE-based inverse problems
+  \item Relaxation can improve optimization landscape
+  \item Data-driven Grammians can be used to bridge between data-driven and PDE-based approaches
   \item Numerical examples show promise, but computational efficiency needs to be improved
 \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Bibliography}
+  \printbibliography % Prints the bibliography
 \end{frame}
 
 \end{document}
