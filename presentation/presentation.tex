@@ -7,7 +7,7 @@
 
 
 \title[Constraint-Relaxation in PDE Inverse Problems]{An Analysis of Constraint-Relaxation in PDE-Based Inverse Problems}
-\author{Tristan van Leeuwen and Yunan Yang}
+\author{Tristan van Leeuwen (CWI, Utrecht U.) and Yunan Yang (Cornell U.)}
 \date{International Workshop on Operator Learning and its Applications}
 
 \newcommand{\sU}{\mathsf{U}}
@@ -47,13 +47,14 @@ We aim to estimate parameters in a PDE from observations.
 \begin{frame}{Classical Formulation}
 Constrained optimization problem:
 \begin{equation*}
-\min_{c\in\sC} \frac{1}{2} \sum_{i,j} |\mP_i(u_j) - d_{ij}|^2 \quad \text{s.t. } \mA_c(u_j, \varphi) = \mP_j(\varphi) \,\,\, \forall \varphi \in \sU,
+\min_{c\in\sC, u\in\sU^n} {\textstyle\frac{1}{2}} \sum_{i,j=1}^n |\mP_i(u_j) - d_{ij}|^2 \quad \text{s.t. } \mA_c(u_j, \varphi) = \mP_j(\varphi) \,\,\, \forall \varphi \in \sU,
 \end{equation*}
 with
 \begin{itemize}
-  \item $\mA_c: \sU\times \sU \rightarrow \mathbb{C}$ a \emph{sesquilinear} form that denotes the PDE with coefficient $c$
+  \item $\mA_c: \sU\times \sU \rightarrow \mathbb{C}$ a \emph{sesquilinear} form which denotes the PDE with coefficient $c$
   \item $\mP_i : \sU \rightarrow \mathbb{C}$ denotes the \emph{anti-linear} sampling operator, which we can also represent as $\mP_i = \langle p_i,\cdot \rangle_\sU$ with $p_i = \mR \mP_i$, with $\mR$ the \emph{linear} Riesz map
   \item $d_{ij} \in \mathbb{C}$ the measured data. 
+  \item Can be solved as unconstrained problem over $\sC$ by eliminating the PDE
 \end{itemize}
 \end{frame}
 
@@ -61,7 +62,7 @@ with
 Relax the constraint by introducing auxiliary source terms $q_j$ \cite{van2015penalty}:
 \begin{equation}
   \label{eq:relaxed}
-\min_{c\in\sC, q\in\sU^n} \frac{1}{2} \sum_{i,j} |\mP_i(u_j) - d_{ij}|^2 + \frac{\rho}{2} \sum_j \|q_j\|_U^2
+\min_{c\in\sC, q\in\sU^n} {\textstyle\frac{1}{2}} \sum_{i,j=1}^n |\mP_i(u_j) - d_{ij}|^2 + {\textstyle\frac{\rho}{2}} \sum_j \|q_j\|_U^2
 \end{equation}
 Subject to:
 \begin{equation*}
@@ -97,11 +98,11 @@ with $\overline{\mA_c(\varphi, w_k)} = \mP_k(\varphi),\, \forall \varphi\in\sU$ 
 \textbf{Lemma 2 \cite{van2025analysis}:}
 The objective in \eqref{eq:relaxed} can be expressed in terms of $c$ alone as 
 \begin{equation*}
-J(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j(c)\|_{(I + \rho^{-1} G(c))^{-1}}^2,
+J(c) = {\textstyle\frac{1}{2}} \sum_{j=1}^n \|\mathbf{e}_j(c)\|_{(I + \rho^{-1} G(c))^{-1}}^2,
 \end{equation*}
 with
 \begin{itemize}
-  \item $e_{ij}(c) = d_{ij}-\mP_i(u_j)$ where $\mA_c(u_j,\varphi)\,\, \forall \varphi\in\sU$,
+  \item $e_{ij}(c) = d_{ij}-\mP_i(u_j)$ where $\mA_c(u_j,\varphi)=\mP_j(\varphi)\,\, \forall \varphi\in\sU$,
   \item $G(c)$ is Gram matrix from adjoint states:
 \begin{equation*}
 G_{ij}(c) = \langle w_i, w_j \rangle_\sU
@@ -112,11 +113,11 @@ G_{ij}(c) = \langle w_i, w_j \rangle_\sU
 \begin{frame}{Limiting cases}
 As $\rho\rightarrow\infty$ we recover the constrained formulation
 \begin{equation*}
-J_\infty(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j(c)\|^2,
+J_\infty(c) = {\textstyle\frac{1}{2}} \sum_{j=1}^n \|\mathbf{e}_j(c)\|^2,
 \end{equation*}
 and for $\rho\rightarrow 0$ we get
 \begin{equation*}
-J_0(c) = \frac{1}{2} \sum_{j=1}^n \|\mathbf{e}_j\|_{G(c)^{-1}}^2
+J_0(c) = {\textstyle\frac{1}{2}} \sum_{j=1}^n \|\mathbf{e}_j\|_{G(c)^{-1}}^2
 \end{equation*}
 \end{frame}
 
@@ -168,7 +169,7 @@ Having access to the Grammian for the true coefficient allows us to compute $J$ 
 \begin{itemize}
   \item reconstruct $G(\check{c})$ from the data
   \item estimate the states $\{\check{u}_i\}_{i=1}^n$ by data-driven ROM-approach to yield $\{\widetilde{u}_i\}_{i=1}^n$ 
-  \item solve for $c$ from $\mA_c(\widetilde{u}_i,\varphi)=\mP_i(\varphi)$ for $\varphi\in \sU^m$.
+  \item solve for $c$ from $\mA_c(\widetilde{u}_i,\varphi)=\mP_i(\varphi)$ for $\varphi\in \sU_m$.
 \end{itemize}
 \end{frame}
 
@@ -239,6 +240,7 @@ $\rho\rightarrow \infty$ (top) and $\rho\rightarrow 0$ (bottom)
   \item Relaxation can improve optimization landscape
   \item Data-driven Grammians can be used to bridge between data-driven and PDE-based approaches
   \item Numerical examples show promise, but computational efficiency needs to be improved
+  \item Better understanding of "convexification" relies on showing that $\mathsf{W}_n = \text{span}\{w_j\}_{j=1}^n$ depends only weakly on $c$
 \end{itemize}
 \end{frame}
 
